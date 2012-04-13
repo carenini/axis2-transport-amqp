@@ -1,0 +1,1 @@
+This is a prototype transport for allowing SOAP over AMQP (RabbitMQ) in Apache Axis2.
