@@ -82,6 +82,12 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
+            <version>${spring.amqp.version}</version>
+        </dependency>
+        
+        <dependency>
 			<groupId>org.apache.axis2</groupId>
 			<artifactId>axis2-transport-base</artifactId>
 			<version>${axis2-version}</version>
