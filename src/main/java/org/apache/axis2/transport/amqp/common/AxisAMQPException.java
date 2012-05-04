@@ -18,11 +18,11 @@ package org.apache.axis2.transport.amqp.common;
 public class AxisAMQPException extends RuntimeException {
     private static final long serialVersionUID = 630157137524249401L;
 
-    AxisAMQPException() {
+    public AxisAMQPException() {
         super();
     }
 
-    AxisAMQPException(String msg) {
+    public AxisAMQPException(String msg) {
         super(msg);
     }
 

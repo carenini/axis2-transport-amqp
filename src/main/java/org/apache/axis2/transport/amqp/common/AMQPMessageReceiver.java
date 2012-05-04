@@ -112,7 +112,7 @@ public class AMQPMessageReceiver {
 
         boolean successful = false;
         try {
-            successful = processThoughEngine(message, ut);
+            successful = processThroughEngine(message, ut);
 
         } catch (AxisFault e) {
             log.error("Axis fault processing message", e);
@@ -139,7 +139,7 @@ public class AMQPMessageReceiver {
      * @throws JMSException, on JMS exceptions
      * @throws AxisFault     on Axis2 errors
      */
-    private boolean processThoughEngine(Message message, UserTransaction ut) throws AxisFault {
+    private boolean processThroughEngine(Message message, UserTransaction ut) throws AxisFault {
     	MessageProperties msg_prop=message.getMessageProperties();
         MessageContext msgContext = endpoint.createMessageContext();
 

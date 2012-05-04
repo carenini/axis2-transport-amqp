@@ -21,7 +21,6 @@ import org.apache.axis2.description.Parameter;
 import org.apache.axis2.description.ParameterInclude;
 import org.apache.axis2.transport.amqp.ctype.ContentTypeRuleSet;
 import org.apache.axis2.transport.amqp.in.AMQPListener;
-import org.apache.axis2.transport.amqp.out.ServiceTaskManagerFactory;
 import org.apache.axis2.transport.base.ParamUtils;
 import org.apache.axis2.transport.base.ProtocolEndpoint;
 import org.apache.axis2.transport.base.threads.WorkerPool;
