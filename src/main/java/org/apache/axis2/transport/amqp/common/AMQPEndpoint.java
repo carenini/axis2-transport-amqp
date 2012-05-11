@@ -19,7 +19,6 @@ import org.apache.axis2.AxisFault;
 import org.apache.axis2.description.AxisService;
 import org.apache.axis2.description.Parameter;
 import org.apache.axis2.description.ParameterInclude;
-import org.apache.axis2.transport.amqp.ctype.ContentTypeRuleSet;
 import org.apache.axis2.transport.amqp.in.AMQPListener;
 import org.apache.axis2.transport.base.ParamUtils;
 import org.apache.axis2.transport.base.ProtocolEndpoint;
@@ -43,7 +42,7 @@ import java.util.HashSet;
 public class AMQPEndpoint extends ProtocolEndpoint {
     private static final Log log = LogFactory.getLog(AMQPEndpoint.class);
     
-    private final AMQPListener listener;
+    private AMQPListener amqp_listener;
     private final WorkerPool workerPool;
     
     private AMQPConnectionFactory cf;
@@ -52,11 +51,10 @@ public class AMQPEndpoint extends ProtocolEndpoint {
     private String replyDestinationName;
     private String replyDestinationType = AMQPConstants.DESTINATION_TYPE_QUEUE;
     private Set<EndpointReference> endpointReferences = new HashSet<EndpointReference>();
-    private ContentTypeRuleSet contentTypeRuleSet;
     private ServiceTaskManager serviceTaskManager;
 
     public AMQPEndpoint(AMQPListener listener, WorkerPool workerPool) {
-        this.listener = listener;
+        this.amqp_listener = listener;
         this.workerPool = workerPool;
     }
 
@@ -136,11 +134,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
         return sb.toString();
     }
 
-    public ContentTypeRuleSet getContentTypeRuleSet() {
-        return contentTypeRuleSet;
-    }
-
-    public AMQPConnectionFactory getCf() {
+    public AMQPConnectionFactory getConnectionFactory() {
         return cf;
     }
 
@@ -161,7 +155,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
         
         AxisService service = (AxisService)params;
         
-        cf = listener.getConnectionFactory(service);
+        cf = amqp_listener.getConnectionFactory(service);
         if (cf == null) {
             return false;
         }
@@ -207,7 +201,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
         computeEPRs(); // compute service EPR and keep for later use        
         
         serviceTaskManager = ServiceTaskManagerFactory.createTaskManagerForService(cf, service, workerPool);
-        serviceTaskManager.setMessageReceiver(new AMQPMessageReceiver(listener, cf, this));
+        serviceTaskManager.setMessageReceiver(new AMQPMessageReceiver(amqp_listener, cf, this));
         
         return true;
     }
@@ -216,4 +210,13 @@ public class AMQPEndpoint extends ProtocolEndpoint {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+	public AMQPListener getAmqpListener() {
+		return amqp_listener;
+	}
+
+	public void setAmqpListener(AMQPListener amqp_listener) {
+		this.amqp_listener = amqp_listener;
+	}
+
 }

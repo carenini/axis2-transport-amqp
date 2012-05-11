@@ -195,7 +195,7 @@ public class AMQPConstants {
     /**
      * A MessageContext property or client Option indicating the JMS message type
      */
-    public static final String JMS_MESSAGE_TYPE = "JMS_MESSAGE_TYPE";
+    public static final String AMQP_MESSAGE_TYPE = "AMQP_MESSAGE_TYPE";
     /**
      * The message type indicating a BytesMessage. See {@link JMS_MESSAGE_TYPE}
      */
@@ -211,7 +211,7 @@ public class AMQPConstants {
     /**
      * A MessageContext property or client Option indicating the JMS correlation id
      */
-    public static final String AMQP_CORRELATION_ID = "AMQP_COORELATION_ID";
+    public static final String AMQP_CORRELATION_ID = "AMQP_CORRELATION_ID";
      /**
      * A MessageContext property or client Option indicating the JMS delivery mode as an Integer or String
      * Value 1 - javax.amqp.DeliveryMode.NON_PERSISTENT
@@ -234,12 +234,12 @@ public class AMQPConstants {
     /**
      * A MessageContext property or client Option indicating the JMS replyTo Destination
      */
-    public static final String JMS_REPLY_TO = "JMS_REPLY_TO";
+    public static final String AMQP_REPLY_TO = "AMQP_REPLY_TO";
     /**
      * A MessageContext property or client Option indicating the JMS replyTo Destination type
      * See {@link DESTINATION_TYPE_QUEUE} and {@link DESTINATION_TYPE_TOPIC}
      */
-    public static final String JMS_REPLY_TO_TYPE = "JMS_REPLY_TO_TYPE";
+    public static final String AMQP_REPLY_TO_TYPE = "AMQP_REPLY_TO_TYPE";
     /**
      * A MessageContext property or client Option indicating the JMS timestamp (Long specified as String)
      */

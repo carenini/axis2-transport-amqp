@@ -32,6 +32,7 @@ import org.apache.axis2.transport.amqp.common.AMQPConnectionFactory;
 import org.apache.axis2.transport.amqp.common.AMQPConnectionFactoryManager;
 import org.apache.axis2.transport.amqp.common.AMQPConstants;
 import org.apache.axis2.transport.amqp.common.AMQPException;
+import org.apache.axis2.transport.amqp.common.AMQPTransportInfo;
 import org.apache.axis2.transport.amqp.common.AMQPUtils;
 import org.apache.axis2.transport.base.*;
 import org.apache.axis2.transport.base.streams.WriterOutputStream;
@@ -89,7 +90,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	 *            the transport-out information
 	 * @return the corresponding JMS connection factory, if any
 	 */
-	private AMQPConnectionFactory getAMQPConnectionFactory(AMQPOutTransportInfo trpInfo) {
+	private AMQPConnectionFactory getAMQPConnectionFactory(AMQPTransportInfo trpInfo) {
 		Map<String, String> props = trpInfo.getProperties();
 		if (trpInfo.getProperties() != null) {
 			String amqpConnectionFactoryName = props.get(AMQPConstants.PARAM_AMQP_CONFAC);
@@ -114,17 +115,17 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	@Override
 	public void sendMessage(MessageContext msgCtx, String targetEPR, OutTransportInfo outTransportInfo) throws AxisFault {
 
-		AMQPOutTransportInfo amqpTransportInfo = null;
+		AMQPTransportInfo amqpTransportInfo = null;
 		ConnectionDetails conDetails = null;
 		Session session = null;
 
 		// If targetEPR is not null, determine the addressing info from it
 		if (targetEPR != null) {
-			amqpTransportInfo = new AMQPOutTransportInfo(targetEPR);
+			amqpTransportInfo = new AMQPTransportInfo(targetEPR);
 		}
 		// If not try to get the addressing info from the transport description
-		else if (outTransportInfo != null && outTransportInfo instanceof AMQPOutTransportInfo) {
-			amqpTransportInfo = (AMQPOutTransportInfo) outTransportInfo;
+		else if (outTransportInfo != null && outTransportInfo instanceof AMQPTransportInfo) {
+			amqpTransportInfo = (AMQPTransportInfo) outTransportInfo;
 		}
 
 		if (_connectionDetails.containsKey(amqpTransportInfo.getConnectionURL())) {
@@ -171,7 +172,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 	}
 
-	private void fillMessageHeaders(MessageContext msgCtx, AMQPOutTransportInfo amqpTransportInfo, Session session, boolean waitForResponse, DeliveryProperties deliveryProps, MessageProperties msgProps) {
+	private void fillMessageHeaders(MessageContext msgCtx, AMQPTransportInfo amqpTransportInfo, Session session, boolean waitForResponse, DeliveryProperties deliveryProps, MessageProperties msgProps) {
 		// Routing info
 		deliveryProps.setExchange(amqpTransportInfo.getDestination().getExchangeName());
 		deliveryProps.setRoutingKey(amqpTransportInfo.getDestination().getRoutingKey());

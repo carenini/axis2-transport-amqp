@@ -19,16 +19,14 @@ import org.apache.axis2.AxisFault;
 import org.apache.axis2.Constants;
 import org.apache.axis2.transport.base.BaseConstants;
 import org.apache.axis2.transport.base.MetricsCollector;
-import org.apache.axis2.transport.amqp.ctype.ContentTypeInfo;
 import org.apache.axis2.transport.amqp.in.AMQPListener;
-import org.apache.axis2.transport.amqp.out.AMQPOutTransportInfo;
 import org.apache.axis2.context.MessageContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.AmqpException;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageDeliveryMode;
-import org.springframework.amqp.core.MessageProperties;
+
+import com.rabbitmq.client.BasicProperties;
+
 
 import javax.transaction.UserTransaction;
 
@@ -73,22 +71,21 @@ public class AMQPMessageReceiver {
      * @param ut      UserTransaction which was used to receive the message
      * @return true if caller should commit
      */
-    public boolean onMessage(Message message, UserTransaction ut) {
-    	MessageProperties msg_prop=message.getMessageProperties();
+    public boolean onMessage(AMQPMessage message, UserTransaction ut) {
+    	BasicProperties msg_prop=message.getProperties();
         
     	if (log.isDebugEnabled()) {
     		StringBuffer sb = new StringBuffer();
     		sb.append("Received new JMS message for service :").append(endpoint.getServiceName());
-    		sb.append("\nDestination    : ").append(msg_prop.getReceivedExchange());
+    		sb.append("\nDestination    : ").append(message.getEnvelope().getExchange());
     		sb.append("\nMessage ID     : ").append(msg_prop.getMessageId());
     		sb.append("\nCorrelation ID : ").append(msg_prop.getCorrelationId());
     		sb.append("\nReplyTo        : ").append(msg_prop.getReplyTo());
-    		sb.append("\nRedelivery ?   : ").append(msg_prop.isRedelivered());
+    		sb.append("\nRedelivery ?   : ").append(message.getEnvelope().isRedeliver());
     		sb.append("\nPriority       : ").append(msg_prop.getPriority());
     		sb.append("\nExpiration     : ").append(msg_prop.getExpiration());
     		sb.append("\nTimestamp      : ").append(msg_prop.getTimestamp());
     		sb.append("\nMessage Type   : ").append(msg_prop.getType());
-    		sb.append("\nPersistent ?   : ").append(MessageDeliveryMode.PERSISTENT == msg_prop.getDeliveryMode());
 
     		log.debug(sb.toString());
     		if (log.isTraceEnabled()) {
@@ -96,7 +93,7 @@ public class AMQPMessageReceiver {
     		}
     	}
         // update transport level metrics
-        metrics.incrementBytesReceived(msg_prop.getContentLength());
+        metrics.incrementBytesReceived(message.getBody().length);
         
 
         // has this message already expired? expiration time == 0 means never expires
@@ -139,8 +136,8 @@ public class AMQPMessageReceiver {
      * @throws JMSException, on JMS exceptions
      * @throws AxisFault     on Axis2 errors
      */
-    private boolean processThroughEngine(Message message, UserTransaction ut) throws AxisFault {
-    	MessageProperties msg_prop=message.getMessageProperties();
+    private boolean processThroughEngine(AMQPMessage message, UserTransaction ut) throws AxisFault {
+    	BasicProperties msg_prop=message.getProperties();
         MessageContext msgContext = endpoint.createMessageContext();
 
         // set the JMS Message ID as the Message ID of the MessageContext
@@ -167,7 +164,7 @@ public class AMQPMessageReceiver {
 
         }
         if (replyTo != null) {
-            msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPOutTransportInfo(amqpConnectionFactory, replyTo, contentTypeInfo.getPropertyName()));
+            msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(amqpConnectionFactory, replyTo, contentTypeInfo.getPropertyName()));
         }
 
         AMQPUtils.setSOAPEnvelope(message, msgContext, contentTypeInfo.getContentType());
