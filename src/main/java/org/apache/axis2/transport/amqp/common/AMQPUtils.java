@@ -34,6 +34,7 @@ import org.apache.axis2.transport.amqp.common.iowrappers.BytesMessageInputStream
 import org.apache.axis2.transport.amqp.in.AMQPListener;
 import org.apache.axis2.transport.base.BaseUtils;
 
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BasicProperties;
 import com.rabbitmq.client.Envelope;
 
@@ -195,8 +196,14 @@ public class AMQPUtils extends BaseUtils {
 		int priority=0;
 		long timestamp=0;
 		String msg_type=null;
+		AMQP.BasicProperties.Builder header_builder=null;
+		AMQP.BasicProperties msg_prop=null;
+		Map<String,Object> headers=new HashMap<String,Object>();
 		
-		BasicProperties msg_prop=message.getProperties();
+		msg_prop=message.getProperties();
+		if (msg_prop==null) {
+			msg_prop=new AMQP.BasicProperties.Builder().build();
+		}
 		Envelope msg_env=message.getEnvelope();
 		
 		Map<?, ?> headerMap = (Map<?, ?>) msgContext.getProperty(MessageContext.TRANSPORT_HEADERS);
@@ -213,40 +220,37 @@ public class AMQPUtils extends BaseUtils {
 			}
 			if (AMQPConstants.AMQP_CORRELATION_ID.equals(name)) {
 				correlation_id=(String) headerMap.get(AMQPConstants.AMQP_CORRELATION_ID);
+				msg_prop=msg_prop.builder().correlationId(correlation_id).build();
 			} else if (AMQPConstants.AMQP_DELIVERY_MODE.equals(name)) {
 				Object o = headerMap.get(AMQPConstants.AMQP_DELIVERY_MODE);
 				if (o instanceof Integer) {
 					delivery_mode=Integer.parseInt((String) o);
+					msg_prop=msg_prop.builder().deliveryMode(delivery_mode).build();
 				} else {
 					log.warn("Invalid delivery mode ignored : " + o);
 				}
 			} else if (AMQPConstants.AMQP_EXPIRATION.equals(name)) {
 				expiration=Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_EXPIRATION));
+				msg_prop=msg_prop.builder().deliveryMode(delivery_mode).build();
 			} else if (AMQPConstants.AMQP_MESSAGE_ID.equals(name)) {
 				message_id=(String) headerMap.get(AMQPConstants.AMQP_MESSAGE_ID);
+				msg_prop=msg_prop.builder().messageId(message_id).build();
 			} else if (AMQPConstants.AMQP_PRIORITY.equals(name)) {
 				priority=Integer.parseInt((String) headerMap.get(AMQPConstants.AMQP_PRIORITY));
+				msg_prop=msg_prop.builder().priority(priority).build();
 			} else if (AMQPConstants.AMQP_TIMESTAMP.equals(name)) {
 				timestamp=Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_TIMESTAMP));
+				//FIXME
+				msg_prop=msg_prop.builder().timestamp(timestamp).build();
 			} else if (AMQPConstants.AMQP_MESSAGE_TYPE.equals(name)) {
 				msg_type=(String) headerMap.get(AMQPConstants.AMQP_MESSAGE_TYPE);
+				msg_prop=msg_prop.builder().type(msg_type).build();
 
 			} else {
 				Object value = headerMap.get(name);
-				if (value instanceof String) {
-					message.setStringProperty(name, (String) value);
-				} else if (value instanceof Boolean) {
-					message.setBooleanProperty(name, (Boolean) value);
-				} else if (value instanceof Integer) {
-					message.setIntProperty(name, (Integer) value);
-				} else if (value instanceof Long) {
-					message.setLongProperty(name, (Long) value);
-				} else if (value instanceof Double) {
-					message.setDoubleProperty(name, (Double) value);
-				} else if (value instanceof Float) {
-					message.setFloatProperty(name, (Float) value);
-				}
+				headers.put(name, value);
 			}
+			msg_prop=msg_prop.builder().headers(headers).build();
 		}
 	}
 
@@ -275,6 +279,7 @@ public class AMQPUtils extends BaseUtils {
 	public static Map<String, Object> getTransportHeaders(AMQPMessage message) {
 		// create a Map to hold transport headers
 		Map<String, Object> map = new HashMap<String, Object>();
+		Map<String, Object> headers = message.getProperties().getHeaders();
 		BasicProperties msg_prop=message.getProperties();
 		Envelope msg_env=message.getEnvelope();
 
@@ -300,7 +305,7 @@ public class AMQPUtils extends BaseUtils {
         // redelivered
         map.put(AMQPConstants.AMQP_REDELIVERED, Boolean.toString(msg_env.isRedeliver()));
         // replyto destination name
-        if (message.getAMQPReplyTo() != null) {
+        if (msg_prop.getReplyTo() != null) {
             Destination dest = new Destination (msg_prop.getReplyTo());
             map.put(AMQPConstants.AMQP_REPLY_TO, dest instanceof Queue ? ((Queue) dest).getQueueName() : ((Topic) dest).getTopicName());
         }
@@ -311,44 +316,17 @@ public class AMQPUtils extends BaseUtils {
             map.put(AMQPConstants.AMQP_TYPE, message.getAMQPType());
         }
         // any other transport properties / headers
-        Enumeration<?> e = null;
-        try {
-            e = message.getPropertyNames();
-            if (e != null) {
-                while (e.hasMoreElements()) {
-                    String headerName = (String) e.nextElement();
-                    try {
-                        map.put(headerName, message.getStringProperty(headerName));
-                        continue;
-                    } catch (AMQPException ignore) {
-                    }
-                    try {
-                        map.put(headerName, message.getBooleanProperty(headerName));
-                        continue;
-                    } catch (AMQPException ignore) {
-                    }
-                    try {
-                        map.put(headerName, message.getIntProperty(headerName));
-                        continue;
-                    } catch (AMQPException ignore) {
-                    }
-                    try {
-                        map.put(headerName, message.getLongProperty(headerName));
-                        continue;
-                    } catch (AMQPException ignore) {
-                    }
-                    try {
-                        map.put(headerName, message.getDoubleProperty(headerName));
-                        continue;
-                    } catch (AMQPException ignore) {
-                    }
-                    try {
-                        map.put(headerName, message.getFloatProperty(headerName));
-                    } catch (AMQPException ignore) {
-                    }
-                }
-            }
-
+        Set<String> e = null;
+        e = msg_prop.getHeaders().keySet();
+        for (String headerName:e){
+        	Object o=headers.get(e);
+        	if (o instanceof String) map.put(headerName, (String)o);
+        	if (o instanceof Boolean) map.put(headerName, (Boolean)o);
+        	if (o instanceof Integer) map.put(headerName, (Integer)o);
+        	if (o instanceof Long) map.put(headerName, (Long)o);
+        	if (o instanceof Double) map.put(headerName, (Double)o);
+        	if (o instanceof Float) map.put(headerName, (Float)o);
+        }
 		return map;
 	}
 

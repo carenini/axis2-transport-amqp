@@ -25,6 +25,7 @@ public class IncomingMessageHandler implements Runnable {
 	private BasicProperties properties=null; 
 	private byte[] body=null;
     private MetricsCollector metrics = null;
+    private AMQPMessage message=null;
     
 	public IncomingMessageHandler(AMQPEndpoint ep, AMQPMessage msg)  {
 		// TODO Auto-generated constructor stub
@@ -33,6 +34,7 @@ public class IncomingMessageHandler implements Runnable {
 		this.envelope=msg.getEnvelope();
 		this.endpoint=ep;
 		this.properties=msg.getProperties();
+		this.message=msg;
 	}
 
 	@Override
