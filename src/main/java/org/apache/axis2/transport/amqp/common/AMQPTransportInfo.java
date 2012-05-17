@@ -32,7 +32,7 @@ import javax.naming.NamingException;
 import java.util.Hashtable;
 
 /**
- * The JMS OutTransportInfo is a holder of information to send an outgoing
+ * The AMQP OutTransportInfo is a holder of information to send an outgoing
  * message (e.g. a Response) to a AMQP destination. Thus at a minimum a
  * reference to a ConnectionFactory and a Destination are held
  */
@@ -43,7 +43,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	/** The naming context */
 	private Context context;
 	/**
-	 * this is a reference to the underlying JMS ConnectionFactory when sending
+	 * this is a reference to the underlying AMQP ConnectionFactory when sending
 	 * messages through connection factories not defined at the TransportSender
 	 * level
 	 */
@@ -169,17 +169,17 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	}
 
 	/**
-	 * Get the JMS destination specified by the given URL from the context
+	 * Get the AMQP destination specified by the given URL from the context
 	 * 
 	 * @param context
 	 *            the Context to lookup
 	 * @param url
 	 *            URL
-	 * @return the JMS destination, or null if it does not exist
+	 * @return the AMQP destination, or null if it does not exist
 	 */
 	private Destination getDestination(String url) {
 		Destination d = AMQPUtils.getDestination(url);
-		log.debug("Lookup the JMS destination " + d.getName() + " of type " + d.getType() + " extracted from the URL " + url);
+		log.debug("Lookup the AMQP destination " + d.getName() + " of type " + d.getType() + " extracted from the URL " + url);
 		return d;
 	}
 
@@ -272,8 +272,8 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		loadConnectionFactoryFromProperies();
 
 		// create a one time connection and session to be used
-		String user = properties != null ? properties.get(AMQPConstants.PARAM_JMS_USERNAME) : null;
-		String pass = properties != null ? properties.get(AMQPConstants.PARAM_JMS_PASSWORD) : null;
+		String user = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_USERNAME) : null;
+		String pass = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_PASSWORD) : null;
 
 		int destType = -1;
 		// TODO: there is something missing here for destination type generic
