@@ -303,4 +303,9 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		return new AMQPMessageSender(connection, producer, destination, amqpConnectionFactory == null ? AMQPConstants.CACHE_NONE : amqpConnectionFactory.getCacheLevel(), false, destType == -1 ? null : destType == AMQPConstants.QUEUE ? Boolean.TRUE : Boolean.FALSE);
 
 	}
+
+	public Object getConnectionURL() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }
