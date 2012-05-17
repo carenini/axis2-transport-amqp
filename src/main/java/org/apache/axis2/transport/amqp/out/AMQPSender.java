@@ -32,17 +32,18 @@ import org.apache.axis2.transport.amqp.common.AMQPConnectionFactory;
 import org.apache.axis2.transport.amqp.common.AMQPConnectionFactoryManager;
 import org.apache.axis2.transport.amqp.common.AMQPConstants;
 import org.apache.axis2.transport.amqp.common.AMQPException;
+import org.apache.axis2.transport.amqp.common.AMQPMessage;
 import org.apache.axis2.transport.amqp.common.AMQPTransportInfo;
 import org.apache.axis2.transport.amqp.common.AMQPUtils;
 import org.apache.axis2.transport.base.*;
 import org.apache.axis2.transport.base.streams.WriterOutputStream;
 import org.apache.axis2.transport.http.HTTPConstants;
 import org.springframework.amqp.core.AmqpTemplate;
-import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-import com.rabbitmq.client.MessageProperties;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.AMQP.BasicProperties;
 
 import javax.activation.DataHandler;
 
@@ -78,7 +79,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	public void init(ConfigurationContext cfgCtx, TransportOutDescription transportOut) throws AxisFault {
 		super.init(cfgCtx, transportOut);
 		connFacManager = new AMQPConnectionFactoryManager(transportOut);
-		log.info("JMS Transport Sender initialized...");
+		log.info("AMQP Transport Sender initialized...");
 	}
 
 	/**
@@ -154,9 +155,9 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 
 		// should we wait for a synchronous response on this same thread?
 		boolean waitForResponse = waitForSynchronousResponse(msgCtx);
-
+		AMQP.BasicProperties.Builder prop_builder = new AMQP.BasicProperties.Builder();
+		AMQP.BasicProperties msgProps = bob.build();
 		DeliveryProperties deliveryProps = new DeliveryProperties();
-		MessageProperties msgProps = new MessageProperties();
 		fillMessageHeaders(msgCtx, amqpTransportInfo, session, waitForResponse, deliveryProps, msgProps);
 
 		synchronized (session) {
@@ -172,7 +173,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 	}
 
-	private void fillMessageHeaders(MessageContext msgCtx, AMQPTransportInfo amqpTransportInfo, Session session, boolean waitForResponse, DeliveryProperties deliveryProps, MessageProperties msgProps) {
+	private void fillMessageHeaders(MessageContext msgCtx, AMQPTransportInfo amqpTransportInfo, Session session, boolean waitForResponse, DeliveryProperties deliveryProps, AMQP.BasicProperties msgProps) {
 		// Routing info
 		deliveryProps.setExchange(amqpTransportInfo.getDestination().getExchangeName());
 		deliveryProps.setRoutingKey(amqpTransportInfo.getDestination().getRoutingKey());
@@ -187,7 +188,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 
 		String contentType = messageFormatter.getContentType(msgCtx, format, msgCtx.getSoapAction());
-		msgProps.setContentType(contentType);
+		msgProps=msgProps.builder().contentType(contentType).build();
 
 		// Custom properties - SOAP ACTION
 		Map<String, Object> props = new HashMap<String, Object>();
@@ -203,7 +204,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 			}
 		}
 
-		msgProps.setApplicationHeaders(props);
+		msgProps=msgProps.builder().headers(props).build();
 
 		// transport headers
 		Map headerMap = (Map) msgCtx.getProperty(MessageContext.TRANSPORT_HEADERS);
@@ -215,7 +216,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 				String name = (String) iter.next();
 
 				if (AMQPConstants.AMQP_CORELATION_ID.equals(name)) {
-					msgProps.setCorrelationId((String) headerMap.get(AMQPConstants.AMQP_CORELATION_ID));
+					msgProps=msgProps.builder().correlationId((String) headerMap.get(AMQPConstants.AMQP_CORRELATION_ID)).build();
 					// If it's request/response, then we need to fill in
 					// corelation id and reply to properties
 				} else if (AMQPConstants.AMQP_DELIVERY_MODE.equals(name)) {
@@ -236,7 +237,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 				} else if (AMQPConstants.AMQP_EXPIRATION.equals(name)) {
 					deliveryProps.setExpiration(Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_EXPIRATION)));
 				} else if (AMQPConstants.AMQP_MESSAGE_ID.equals(name)) {
-					msgProps.setMessageId((String) headerMap.get(AMQPConstants.AMQP_MESSAGE_ID));
+					msgProps=msgProps.builder().messageId((String) headerMap.get(AMQPConstants.AMQP_MESSAGE_ID)).build();
 				} else if (AMQPConstants.AMQP_PRIORITY.equals(name)) {
 					deliveryProps.setPriority(Short.parseShort((String) headerMap.get(AMQPConstants.AMQP_PRIORITY)));
 				} else if (AMQPConstants.AMQP_TIMESTAMP.equals(name)) {
@@ -267,7 +268,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 
 			// for fannout exchange or some other custom exchange, the routing
 			// key maybe null
-			msgProps.setReplyTo(new ReplyTo(replyExchangeName, replyRoutingKey));
+			msgProps=msgProps.builder().replyTo(new ReplyTo(replyExchangeName, replyRoutingKey)).build();
 		}
 
 		// If it's request/response, then we need to fill in reply to properties
@@ -276,9 +277,9 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 
 			if (waitForResponse && msgProps.getCorrelationId() == null) {
 				if (msgCtx.getProperty(AMQPConstants.AMQP_CORELATION_ID) != null) {
-					msgProps.setCorrelationId((String) msgCtx.getProperty(AMQPConstants.AMQP_CORELATION_ID));
+					msgProps=msgProps.builder().correlationId((String) msgCtx.getProperty(AMQPConstants.AMQP_CORELATION_ID)).build();
 				} else {
-					msgProps.setCorrelationId(UUIDGenerator.getUUID());
+					msgProps=msgProps.builder().correlationId(UUIDGenerator.getUUID()).build();
 				}
 
 			}
@@ -317,7 +318,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 	}
 
-	private void waitForResponseAndProcess(Session session, MessageProperties msgProps, MessageContext msgCtx) throws AxisFault {
+	private void waitForResponseAndProcess(Session session, AMQP.BasicProperties msgProps, MessageContext msgCtx) throws AxisFault {
 
 		long timeout = AMQPConstants.DEFAULT_AMQP_TIMEOUT;
 		String waitReply = (String) msgCtx.getProperty(AMQPConstants.AMQP_WAIT_REPLY);
@@ -330,7 +331,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		MessageManager listener = new MessageManager(session, destination, msgProps.getCorrelationId());
 		session.messageSubscribe(msgProps.getReplyTo().getRoutingKey(), destination, Session.TRANSFER_CONFIRM_MODE_REQUIRED, Session.TRANSFER_ACQUIRE_MODE_PRE_ACQUIRE, new MessagePartListenerAdapter(listener), null, Option.NO_OPTION);
 
-		Message reply = listener.receive(timeout);
+		AMQPMessage reply = listener.receive(timeout);
 
 		if (reply != null) {
 			processSyncResponse(msgCtx, reply);
@@ -340,7 +341,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 	}
 
-	private void processSyncResponse(MessageContext outMsgCtx, Message message) throws AxisFault {
+	private void processSyncResponse(MessageContext outMsgCtx, AMQPMessage message) throws AxisFault {
 
 		MessageContext responseMsgCtx = createResponseMessageContext(outMsgCtx);
 
@@ -357,9 +358,9 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		// workaround as Axis2 1.2 is about to be released and  1.0
 		responseMsgCtx.setServerSide(false);
 
-		String contentType = JMSUtils.getInstace().getProperty(message, BaseConstants.CONTENT_TYPE);
+		String contentType = AMQPUtils.getProperty(message, BaseConstants.CONTENT_TYPE);
 
-		AMQPUtils.getInstace().setSOAPEnvelope(message, responseMsgCtx, contentType);
+		AMQPUtils.setSOAPEnvelope(message, responseMsgCtx, contentType);
 		responseMsgCtx.setServerSide(true);
 
 		handleIncomingMessage(responseMsgCtx, map, (String) map.get(BaseConstants.SOAPACTION), contentType);

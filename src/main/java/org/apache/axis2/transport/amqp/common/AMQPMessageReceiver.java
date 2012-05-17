@@ -146,7 +146,7 @@ public class AMQPMessageReceiver {
 
         String soapAction = AMQPUtils.getProperty(message, BaseConstants.SOAPACTION);
 
-        ContentTypeInfo contentTypeInfo =endpoint.getContentTypeRuleSet().getContentTypeInfo(message);
+        String contentTypeInfo =message.getProperties().getContentType();
         if (contentTypeInfo == null) {
             throw new AxisFault("Unable to determine content type for message " + msgContext.getMessageID());
         }
@@ -164,19 +164,19 @@ public class AMQPMessageReceiver {
 
         }
         if (replyTo != null) {
-            msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(amqpConnectionFactory, replyTo, contentTypeInfo.getPropertyName()));
+            msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(amqpConnectionFactory, new Destination(replyTo)));
+            //, contentTypeInfo.getPropertyName()));
         }
 
-        AMQPUtils.setSOAPEnvelope(message, msgContext, contentTypeInfo.getContentType());
+        AMQPUtils.setSOAPEnvelope(message, msgContext, contentTypeInfo);
         if (ut != null) {
             msgContext.setProperty(BaseConstants.USER_TRANSACTION, ut);
         }
 
         try {
-            amqpListener.handleIncomingMessage(msgContext, AMQPUtils.getTransportHeaders(message), soapAction, contentTypeInfo.getContentType());
+            amqpListener.handleIncomingMessage(msgContext, AMQPUtils.getTransportHeaders(message), soapAction, contentTypeInfo);
 
         } finally {
-
             Object o = msgContext.getProperty(BaseConstants.SET_ROLLBACK_ONLY);
             if (o != null) {
                 if ((o instanceof Boolean && ((Boolean) o)) ||

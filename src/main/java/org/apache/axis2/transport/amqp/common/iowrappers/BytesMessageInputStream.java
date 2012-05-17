@@ -1,74 +1,62 @@
 /*
-* Copyright 2004,2005 The Apache Software Foundation.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2004,2005 The Apache Software Foundation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.axis2.transport.amqp.common.iowrappers;
 
 import java.io.InputStream;
 
 import org.apache.axis2.transport.amqp.common.AMQPMessage;
 
-
 /**
- * Input stream that reads data from a JMS {@link BytesMessage}.
- * Note that since the current position in the message is managed by
- * the underlying {@link BytesMessage} object, it is not possible to
- * use several instances of this class operating on a single
- * {@link BytesMessage} at the same time.
+ * Input stream that reads data from a JMS {@link BytesMessage}. Note that since
+ * the current position in the message is managed by the underlying
+ * {@link BytesMessage} object, it is not possible to use several instances of
+ * this class operating on a single {@link BytesMessage} at the same time.
  */
 public class BytesMessageInputStream extends InputStream {
-    private final AMQPMessage message;
+	private final AMQPMessage message;
 
-    public BytesMessageInputStream(AMQPMessage message) {
-        this.message = message;
-    }
+	public BytesMessageInputStream(AMQPMessage message) {
+		this.message = message;
+	}
 
-    @Override
-    public int read() throws AMQPExceptionWrapper {
-        try {
-            return message.readByte() & 0xFF;
-        } catch (MessageEOFException ex) {
-            return -1;
-        } catch (JMSException ex) {
-            throw new AMQPExceptionWrapper(ex);
-        }
-    }
+	@Override
+	public int read() throws AMQPExceptionWrapper {
+		try {
+			return message.readByte() & 0xFF;
+		} catch (MessageEOFException ex) {
+			return -1;
+		}
+	}
 
-    @Override
-    public int read(byte[] b, int off, int len) throws AMQPExceptionWrapper {
-        if (off == 0) {
-            try {
-                return message.readBytes(b, len);
-            } catch (JMSException ex) {
-                throw new AMQPExceptionWrapper(ex);
-            }
-        } else {
-            byte[] b2 = new byte[len];
-            int c = read(b2);
-            if (c > 0) {
-                System.arraycopy(b2, 0, b, off, c); 
-            }
-            return c;
-        }
-    }
+	@Override
+	public int read(byte[] b, int off, int len) throws AMQPExceptionWrapper {
+		if (off == 0) {
+			return message.readBytes(b, len);
+		} else {
+			byte[] b2 = new byte[len];
+			int c = read(b2);
+			if (c > 0) {
+				System.arraycopy(b2, 0, b, off, c);
+			}
+			return c;
+		}
+	}
 
-    @Override
-    public int read(byte[] b) throws AMQPExceptionWrapper {
-        try {
-            return message.readBytes(b);
-        } catch (JMSException ex) {
-            throw new AMQPExceptionWrapper(ex);
-        }
-    }
+	@Override
+	public int read(byte[] b) {
+		return message.readBytes(b);
+	}
 }

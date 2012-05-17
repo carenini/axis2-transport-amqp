@@ -31,10 +31,10 @@ import java.util.Hashtable;
 /**
  * Encapsulate an AMQP Connection factory definition within an Axis2.xml
  *
- * JMS Connection Factory definitions, allows JNDI properties as well as other service
+ * AMQP Connection Factory definitions, allows JNDI properties as well as other service
  * level parameters to be defined, and re-used by each service that binds to it
  *
- * When used for sending messages out, the JMSConnectionFactory'ies are able to cache
+ * When used for sending messages out, the AMQPConnectionFactory'ies are able to cache
  * a Connection, Session or Producer
  */
 public class AMQPConnectionFactory {
@@ -45,8 +45,8 @@ public class AMQPConnectionFactory {
 	private String name;
 
     /**
-     * Digest a JMS CF definition from an axis2.xml 'Parameter' and construct
-     * @param parameter the axis2.xml 'Parameter' that defined the JMS CF
+     * Digest a AMQP CF definition from an axis2.xml 'Parameter' and construct
+     * @param parameter the axis2.xml 'Parameter' that defined the AMQP CF
      */
     public AMQPConnectionFactory(Parameter parameter) {
         confac=new CachingConnectionFactory();
@@ -57,7 +57,7 @@ public class AMQPConnectionFactory {
         try {
             pi.deserializeParameters((OMElement) parameter.getValue());
         } catch (AxisFault axisFault) {
-            handleException("Error reading parameters for JMS connection factory" + name, axisFault);
+            handleException("Error reading parameters for AMQP connection factory" + name, axisFault);
         }
 
         for (Object o : pi.getParameters()) {
@@ -76,8 +76,8 @@ public class AMQPConnectionFactory {
     }
 
     /**
-     * Return the name assigned to this JMS CF definition
-     * @return name of the JMS CF
+     * Return the name assigned to this AMQP CF definition
+     * @return name of the AMQP CF
      */
     public String getName() {
         return name;
@@ -85,7 +85,7 @@ public class AMQPConnectionFactory {
 
     /**
      * The list of properties (including JNDI and non-JNDI)
-     * @return properties defined on the JMS CF
+     * @return properties defined on the AMQP CF
      */
     public Hashtable<String, String> getParameters() {
         return parameters;
@@ -97,8 +97,8 @@ public class AMQPConnectionFactory {
     }
 
     /**
-     * Get a new Connection or shared Connection from this JMS CF
-     * @return new or shared Connection from this JMS CF
+     * Get a new Connection or shared Connection from this AMQP CF
+     * @return new or shared Connection from this AMQP CF
      */
     public Connection getConnection() {
     	return confac.createConnection();

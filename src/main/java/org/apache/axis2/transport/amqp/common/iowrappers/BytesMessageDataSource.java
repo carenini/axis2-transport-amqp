@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import javax.jms.BytesMessage;
-import javax.jms.JMSException;
-
 import org.apache.axiom.attachments.SizeAwareDataSource;
 import org.apache.axis2.transport.amqp.common.AMQPMessage;
 
@@ -56,11 +53,7 @@ public class BytesMessageDataSource implements SizeAwareDataSource {
 	}
 
 	public InputStream getInputStream() throws IOException {
-		try {
 			message.reset();
-		} catch (JMSException ex) {
-			throw new AMQPExceptionWrapper(ex);
-		}
 		return new BytesMessageInputStream(message);
 	}
 

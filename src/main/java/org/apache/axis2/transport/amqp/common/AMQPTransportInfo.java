@@ -21,8 +21,10 @@ import org.apache.axis2.transport.base.BaseUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.core.AmqpTemplate;
-import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+
+import com.rabbitmq.client.Connection;
+
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -69,7 +71,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 * the message property name that stores the content type of the outgoing
 	 * message
 	 */
-	private String contentTypeProperty;
+	private String contentType;
 
 	private String replyDestinationName;
 
@@ -85,13 +87,13 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 *            the AMQP connection factory
 	 * @param dest
 	 *            the destination
-	 * @param contentTypeProperty
+	 * @param contentType
 	 *            the content type
 	 */
-	public AMQPTransportInfo(AMQPConnectionFactory amqpConnectionFactory, Destination dest, String contentTypeProperty) {
+	public AMQPTransportInfo(AMQPConnectionFactory amqpConnectionFactory, Destination dest, String contentType) {
 		this.amqpConnectionFactory = amqpConnectionFactory;
 		this.destination = dest;
-		this.contentTypeProperty = contentTypeProperty;
+		this.contentType = contentType;
 	}
 
 	/**
@@ -119,7 +121,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 			}
 
 			replyDestinationName = properties.get(AMQPConstants.PARAM_REPLY_DESTINATION);
-			contentTypeProperty = properties.get(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
+			contentType = properties.get(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
 			try {
 				context = new InitialContext(properties);
 			} catch (NamingException e) {
@@ -251,20 +253,17 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	}
 
 	public String getContentTypeProperty() {
-		return contentTypeProperty;
+		return contentType;
 	}
 
 	public void setContentTypeProperty(String contentTypeProperty) {
-		this.contentTypeProperty = contentTypeProperty;
+		this.contentType = contentTypeProperty;
 	}
 
 	/**
-	 * Create a one time MessageProducer for this JMS OutTransport information.
-	 * For simplicity and best compatibility, this method uses only JMS 1.0.2b
-	 * API. Please be cautious when making any changes
-	 * 
-	 * @return a JMSSender based on one-time use resources
-	 * @throws JMSException
+	 * Create a one time MessageProducer for this AMQP OutTransport information.
+	 * @return a AMQPSender based on one-time use resources
+	 * @throws AMQPException
 	 *             on errors, to be handled and logged by the caller
 	 */
 	public AMQPMessageSender createAMQPSender() {
@@ -289,7 +288,6 @@ public class AMQPTransportInfo implements OutTransportInfo {
 			connection = amqpConnectionFactory != null ? amqpConnectionFactory.getConnection() : null;
 		}
 
-		Session session = null;
 		AmqpTemplate producer = null;
 
 		if (connection != null) {
@@ -302,7 +300,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 			}
 		}
 
-		return new AMQPMessageSender(connection, session, producer, destination, amqpConnectionFactory == null ? AMQPConstants.CACHE_NONE : amqpConnectionFactory.getCacheLevel(), false, destType == -1 ? null : destType == AMQPConstants.QUEUE ? Boolean.TRUE : Boolean.FALSE);
+		return new AMQPMessageSender(connection, producer, destination, amqpConnectionFactory == null ? AMQPConstants.CACHE_NONE : amqpConnectionFactory.getCacheLevel(), false, destType == -1 ? null : destType == AMQPConstants.QUEUE ? Boolean.TRUE : Boolean.FALSE);
 
 	}
 }

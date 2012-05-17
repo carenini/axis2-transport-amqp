@@ -241,7 +241,7 @@ public class AMQPUtils extends BaseUtils {
 			} else if (AMQPConstants.AMQP_TIMESTAMP.equals(name)) {
 				timestamp=Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_TIMESTAMP));
 				//FIXME
-				msg_prop=msg_prop.builder().timestamp(timestamp).build();
+				msg_prop=msg_prop.builder().timestamp(new Date(timestamp)).build();
 			} else if (AMQPConstants.AMQP_MESSAGE_TYPE.equals(name)) {
 				msg_type=(String) headerMap.get(AMQPConstants.AMQP_MESSAGE_TYPE);
 				msg_prop=msg_prop.builder().type(msg_type).build();
@@ -289,11 +289,12 @@ public class AMQPUtils extends BaseUtils {
         }
         // set the delivery mode as persistent or not
         map.put(AMQPConstants.AMQP_DELIVERY_MODE, Integer.toString(msg_prop.getDeliveryMode()));
-        // destination name
+        // FIXME ? Extract destination from... where?
+       /*// destination name
         if (message.getAMQPDestination() != null) {
             Destination dest = message.getAMQPDestination();
             map.put(AMQPConstants.AMQP_DESTINATION, dest instanceof Queue ? ((Queue) dest).getQueueName() : ((Topic) dest).getTopicName());
-        }
+        }*/
         // expiration
         map.put(AMQPConstants.AMQP_EXPIRATION, msg_prop.getExpiration());
         // if a AMQP message ID is found
@@ -307,13 +308,13 @@ public class AMQPUtils extends BaseUtils {
         // replyto destination name
         if (msg_prop.getReplyTo() != null) {
             Destination dest = new Destination (msg_prop.getReplyTo());
-            map.put(AMQPConstants.AMQP_REPLY_TO, dest instanceof Queue ? ((Queue) dest).getQueueName() : ((Topic) dest).getTopicName());
+            map.put(AMQPConstants.AMQP_REPLY_TO, dest);
         }
         // priority
-        map.put(AMQPConstants.AMQP_TIMESTAMP, Long.toString(msg_prop.getTimestamp()));
+        map.put(AMQPConstants.AMQP_TIMESTAMP, Long.toString(msg_prop.getTimestamp().getTime()));
         // message type
-        if (message.getAMQPType() != null) {
-            map.put(AMQPConstants.AMQP_TYPE, message.getAMQPType());
+        if (msg_prop.getType() != null) {
+            map.put(AMQPConstants.AMQP_TYPE, msg_prop.getType());
         }
         // any other transport properties / headers
         Set<String> e = null;

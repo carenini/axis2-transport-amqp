@@ -49,7 +49,7 @@ public class ServiceTaskManager {
 	
 	public ServiceTaskManager() {
 		consumers=new HashSet<String>();
-		message_consumer=new Consumer(null, null);
+		message_consumer=new Consumer(null, null, workerPool);
 	}
 	
 	public ServiceTaskManager(String service_name) {

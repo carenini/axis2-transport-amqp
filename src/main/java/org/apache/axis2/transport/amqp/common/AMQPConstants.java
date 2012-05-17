@@ -247,7 +247,7 @@ public class AMQPConstants {
     /**
      * A MessageContext property indicating the JMS type String returned by {@link javax.amqp.Message.getJMSType()}
      */
-    public static final String JMS_TYPE = "JMS_TYPE";
+    public static final String AMQP_TYPE = "AMQP_TYPE";
     /**
      * A MessageContext property or client Option indicating the JMS priority
      */

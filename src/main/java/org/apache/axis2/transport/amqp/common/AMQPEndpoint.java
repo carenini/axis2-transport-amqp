@@ -117,8 +117,8 @@ public class AMQPEndpoint extends ProtocolEndpoint {
         sb.append("?").append(AMQPConstants.PARAM_DEST_TYPE).append("=").append(
             destinationType == AMQPConstants.EXCHANGE ?
                 AMQPConstants.DESTINATION_TYPE_EXCHANGE : AMQPConstants.DESTINATION_TYPE_QUEUE);
-
-        if (contentTypeRuleSet != null) {
+//FIXME
+        /*if (contentTypeRuleSet != null) {
             String contentTypeProperty = contentTypeRuleSet.getDefaultContentTypeProperty();
             if (contentTypeProperty != null) {
                 sb.append("&");
@@ -126,7 +126,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
                 sb.append("=");
                 sb.append(contentTypeProperty);
             }
-        }
+        }*/
 
 		for (Map.Entry<String, String> entry : cf.getParameters().entrySet()) {
 			sb.append("&").append(entry.getKey()).append("=").append(entry.getValue());

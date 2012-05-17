@@ -28,28 +28,16 @@ public class BytesMessageOutputStream extends OutputStream {
 
     @Override
     public void write(int b) throws AMQPExceptionWrapper {
-        try {
             message.writeByte((byte)b);
-        } catch (JMSException ex) {
-            throw new AMQPExceptionWrapper(ex);
-        }
     }
 
     @Override
     public void write(byte[] b, int off, int len) throws AMQPExceptionWrapper {
-        try {
             message.writeBytes(b, off, len);
-        } catch (JMSException ex) {
-            new AMQPExceptionWrapper(ex);
-        }
     }
 
     @Override
     public void write(byte[] b) throws AMQPExceptionWrapper {
-        try {
             message.writeBytes(b);
-        } catch (JMSException ex) {
-            throw new AMQPExceptionWrapper(ex);
-        }
     }
 }

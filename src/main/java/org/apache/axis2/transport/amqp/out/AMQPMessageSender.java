@@ -19,6 +19,8 @@
 
 package org.apache.axis2.transport.amqp.out;
 
+import java.io.IOException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.axis2.context.MessageContext;
@@ -33,6 +35,8 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.Connection;
 
+import com.rabbitmq.client.Channel;
+
 import javax.transaction.*;
 
 /**
@@ -44,7 +48,7 @@ public class AMQPMessageSender {
 
     private static final Log log = LogFactory.getLog(AMQPMessageSender.class);
 	private Connection connection;
-	private Session session;
+	private Channel chan;
 	private AmqpTemplate producer;
 	private Destination destination;
 	private int cacheLevel;
@@ -55,17 +59,17 @@ public class AMQPMessageSender {
     /**
      * This is a low-end method to support the one-time sends using JMS 1.0.2b
      * @param connection the JMS Connection
-     * @param session JMS Session
+     * @param session JMS Channel
      * @param producer the MessageProducer
      * @param destination the JMS Destination
-     * @param cacheLevel cacheLevel - None | Connection | Session | Producer
+     * @param cacheLevel cacheLevel - None | Connection | Channel | Producer
      * @param jmsSpec11 true if the JMS 1.1 API should be used
      * @param isQueue posting to a Queue?
      */
-    public AMQPMessageSender(Connection connection, Session session, AmqpTemplate producer, Destination destination, int cacheLevel, boolean jmsSpec11, Boolean isQueue) {
+    public AMQPMessageSender(Connection connection, Channel session, AmqpTemplate producer, Destination destination, int cacheLevel, boolean jmsSpec11, Boolean isQueue) {
 
         this.connection = connection;
-        this.session = session;
+        this.chan = session;
         this.producer = producer;
         this.destination = destination;
         this.cacheLevel = cacheLevel;
@@ -154,15 +158,15 @@ public class AMQPMessageSender {
         		}
 
         	} else {
-        		if (session.getTransacted()) {
+        		if (chan.getTransacted()) {
         			if (sendingSuccessful && (rollbackOnly == null || !rollbackOnly)) {
-        				session.commit();
+        				chan.commit();
         			} else {
-        				session.rollback();
+        				chan.rollback();
         			}
         		}
         		if (log.isDebugEnabled()) {
-        			log.debug((sendingSuccessful ? "Committed" : "Rolled back") +" local (JMS Session) Transaction");
+        			log.debug((sendingSuccessful ? "Committed" : "Rolled back") +" local (JMS Channel) Transaction");
         		}
         	}
         }
@@ -171,20 +175,12 @@ public class AMQPMessageSender {
      * Close non-shared producer, session and connection if any
      */
     public void close() {
-    	if (producer != null && cacheLevel < AMQPConstants.CACHE_PRODUCER) {
-    		producer.close();
-    		producer = null;
-    	}
-
-    	if (session != null && cacheLevel < AMQPConstants.CACHE_SESSION) {
-    		session.close();
-    		session = null;
-    	}
-
-    	if (connection != null && cacheLevel < AMQPConstants.CACHE_CONNECTION) {
-    		connection.close();
-    		connection = null;
-    	}
+    	try {
+			chan.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 
     private void handleException(String message, Exception e) {
