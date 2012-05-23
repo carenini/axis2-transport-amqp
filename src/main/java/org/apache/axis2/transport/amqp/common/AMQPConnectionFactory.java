@@ -15,6 +15,7 @@
 */
 package org.apache.axis2.transport.amqp.common;
 
+import java.io.IOException;
 import java.util.Hashtable;
 
 import org.apache.commons.logging.Log;
@@ -23,8 +24,9 @@ import org.apache.axis2.description.Parameter;
 import org.apache.axis2.description.ParameterIncludeImpl;
 import org.apache.axis2.AxisFault;
 import org.apache.axiom.om.OMElement;
-import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
-import org.springframework.amqp.rabbit.connection.Connection;
+
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
 
 import java.util.Hashtable;
 
@@ -40,7 +42,7 @@ import java.util.Hashtable;
 public class AMQPConnectionFactory {
 
     private static final Log log = LogFactory.getLog(AMQPConnectionFactory.class);
-    private CachingConnectionFactory confac=null;
+    private ConnectionFactory confac=null;
     private Hashtable<String, String> parameters = new Hashtable<String, String>();
 	private String name;
 
@@ -49,7 +51,7 @@ public class AMQPConnectionFactory {
      * @param parameter the axis2.xml 'Parameter' that defined the AMQP CF
      */
     public AMQPConnectionFactory(Parameter parameter) {
-        confac=new CachingConnectionFactory();
+        confac=new ConnectionFactory();
 
         this.name = parameter.getName();
         ParameterIncludeImpl pi = new ParameterIncludeImpl();
@@ -99,9 +101,10 @@ public class AMQPConnectionFactory {
     /**
      * Get a new Connection or shared Connection from this AMQP CF
      * @return new or shared Connection from this AMQP CF
+     * @throws IOException 
      */
-    public Connection getConnection() {
-    	return confac.createConnection();
+    public Connection getConnection() throws IOException {
+    	return confac.newConnection();
     }
 
 	

@@ -93,7 +93,6 @@ public class IncomingMessageHandler implements Runnable {
 			listener.handleIncomingMessage(msgContext, AMQPUtils.getTransportHeaders(message), soapAction, contentTypeInfo);
 
 		} catch (AxisFault e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} finally {
 

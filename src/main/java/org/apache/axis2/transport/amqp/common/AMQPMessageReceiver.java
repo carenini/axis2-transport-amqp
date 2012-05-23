@@ -23,7 +23,6 @@ import org.apache.axis2.transport.amqp.in.AMQPListener;
 import org.apache.axis2.context.MessageContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.amqp.AmqpException;
 
 import com.rabbitmq.client.BasicProperties;
 
@@ -164,7 +163,7 @@ public class AMQPMessageReceiver {
 
         }
         if (replyTo != null) {
-            msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(amqpConnectionFactory, new Destination(replyTo)));
+            msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(amqpConnectionFactory, new Destination(replyTo),contentTypeInfo));
             //, contentTypeInfo.getPropertyName()));
         }
 
@@ -184,7 +183,7 @@ public class AMQPMessageReceiver {
                     return false;
                 }
             }
-            return true;
         }
+        return true;
     }
 }

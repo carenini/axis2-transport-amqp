@@ -103,7 +103,7 @@ public class AMQPConstants {
     /**
      * The Parameter name indicating the JMS connection factory JNDI name
      */
-    public static final String PARAM_CONFAC_JNDI_NAME = "transport.amqp.ConnectionFactoryJNDIName";
+    public static final String PARAM_CONFAC_ID = "transport.amqp.ConnectionFactoryJNDIName";
     /**
      * The Parameter indicating the expected content type for messages received by the service.
      */

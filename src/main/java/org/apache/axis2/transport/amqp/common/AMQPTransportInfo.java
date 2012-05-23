@@ -20,15 +20,13 @@ import org.apache.axis2.transport.amqp.out.AMQPMessageSender;
 import org.apache.axis2.transport.base.BaseUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.amqp.core.AmqpTemplate;
-import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
+
+import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
 
-
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
+import java.io.IOException;
 import java.util.Hashtable;
 
 /**
@@ -40,8 +38,6 @@ public class AMQPTransportInfo implements OutTransportInfo {
 
 	private static final Log log = LogFactory.getLog(AMQPTransportInfo.class);
 
-	/** The naming context */
-	private Context context;
 	/**
 	 * this is a reference to the underlying AMQP ConnectionFactory when sending
 	 * messages through connection factories not defined at the TransportSender
@@ -122,11 +118,6 @@ public class AMQPTransportInfo implements OutTransportInfo {
 
 			replyDestinationName = properties.get(AMQPConstants.PARAM_REPLY_DESTINATION);
 			contentType = properties.get(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
-			try {
-				context = new InitialContext(properties);
-			} catch (NamingException e) {
-				handleException("Could not get an initial context using " + properties, e);
-			}
 
 			destination = getDestination(targetEPR);
 			replyDestination = getReplyDestination(targetEPR);
@@ -139,7 +130,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 */
 	public void loadConnectionFactoryFromProperies() {
 		if (properties != null) {
-			connectionFactory = getConnectionFactory(context, properties);
+			connectionFactory = getConnectionFactory(properties);
 		}
 	}
 
@@ -153,17 +144,12 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 *            the properties which contains the JNDI name of the factory
 	 * @return the connection factory
 	 */
-	private ConnectionFactory getConnectionFactory(Context context, Hashtable<String, String> props) {
-		try {
-
-			String conFacJndiName = props.get(AMQPConstants.PARAM_CONFAC_JNDI_NAME);
-			if (conFacJndiName != null) {
-				return AMQPUtils.lookup(context, ConnectionFactory.class, conFacJndiName);
-			} else {
-				handleException("Connection Factory JNDI name cannot be determined");
-			}
-		} catch (NamingException e) {
-			handleException("Failed to look up connection factory from JNDI", e);
+	private ConnectionFactory getConnectionFactory(Hashtable<String, String> props) {
+		String conFacId = props.get(AMQPConstants.PARAM_CONFAC_ID);
+		if (conFacId != null) {
+			return AMQPUtils.lookup(ConnectionFactory.class, conFacId);
+		} else {
+			handleException("Connection Factory JNDI name cannot be determined");
 		}
 		return null;
 	}
@@ -263,11 +249,14 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	/**
 	 * Create a one time MessageProducer for this AMQP OutTransport information.
 	 * @return a AMQPSender based on one-time use resources
+	 * @throws IOException 
 	 * @throws AMQPException
 	 *             on errors, to be handled and logged by the caller
 	 */
-	public AMQPMessageSender createAMQPSender() {
-
+	public AMQPMessageSender createAMQPSender() throws IOException {
+		Channel chan = null;
+		Connection connection = null;
+		
 		// digest the targetAddress and locate CF from the EPR
 		loadConnectionFactoryFromProperies();
 
@@ -276,31 +265,27 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		String pass = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_PASSWORD) : null;
 
 		int destType = -1;
-		// TODO: there is something missing here for destination type generic
 		if (AMQPConstants.DESTINATION_TYPE_QUEUE.equals(destinationType)) {
 			destType = AMQPConstants.QUEUE;
 		} else if (AMQPConstants.DESTINATION_TYPE_EXCHANGE.equals(destinationType)) {
 			destType = AMQPConstants.EXCHANGE;
 		}
 
-		Connection connection = null;
 		if (connection == null) {
 			connection = amqpConnectionFactory != null ? amqpConnectionFactory.getConnection() : null;
 		}
 
-		AmqpTemplate producer = null;
-
+		chan=connection.createChannel();
 		if (connection != null) {
 			if (destType == AMQPConstants.QUEUE) {
-				session = ((QueueConnection) connection).createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
-				producer = ((QueueSession) session).createSender((Queue) destination);
+				chan.queueDeclare(destination.getName(), false, false, true, null);
 			} else {
-				session = ((TopicConnection) connection).createTopicSession(false, Session.AUTO_ACKNOWLEDGE);
-				producer = ((TopicSession) session).createPublisher((Topic) destination);
+				//TODO exchange type!
+				chan.exchangeDeclare(destination.getName(), "direct", true);
 			}
 		}
 
-		return new AMQPMessageSender(connection, producer, destination, amqpConnectionFactory == null ? AMQPConstants.CACHE_NONE : amqpConnectionFactory.getCacheLevel(), false, destType == -1 ? null : destType == AMQPConstants.QUEUE ? Boolean.TRUE : Boolean.FALSE);
+		return new AMQPMessageSender(chan, destination);
 
 	}
 

@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.rabbitmq.client.Connection;
+
 
 /** sample uri formats - this is temporary until the AMQP WG defines a proper addressing scheme
 *
@@ -148,6 +150,4 @@ public class Destination {
 	}
 
 
-
-    
 }
