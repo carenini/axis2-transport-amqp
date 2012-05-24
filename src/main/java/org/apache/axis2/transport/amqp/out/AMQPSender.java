@@ -42,6 +42,9 @@ import org.apache.axis2.transport.http.HTTPConstants;
 
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.AMQP.BasicProperties;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Envelope;
 
 import javax.activation.DataHandler;
 
@@ -57,7 +60,7 @@ import java.util.*;
  */
 public class AMQPSender extends AbstractTransportSender implements ManagementSupport {
 
-	public static final String TRANSPORT_NAME = Constants.TRANSPORT_JMS;
+	public static final String TRANSPORT_NAME = AMQPConstants.TRANSPORT_AMQP;
 
 	/** The JMS connection factory manager to be used when sending messages out */
 	private AMQPConnectionFactoryManager connFacManager;
@@ -81,7 +84,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	}
 
 	/**
-	 * Get corresponding JMS connection factory defined within the transport
+	 * Get corresponding connection factory defined within the transport
 	 * sender for the transport-out information - usually constructed from a
 	 * targetEPR
 	 * 
@@ -115,9 +118,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	public void sendMessage(MessageContext msgCtx, String targetEPR, OutTransportInfo outTransportInfo) throws AxisFault {
 
 		AMQPTransportInfo amqpTransportInfo = null;
-		ConnectionDetails conDetails = null;
-		Session session = null;
-
+		
 		// If targetEPR is not null, determine the addressing info from it
 		if (targetEPR != null) {
 			amqpTransportInfo = new AMQPTransportInfo(targetEPR);
@@ -171,7 +172,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 	}
 
-	private void fillMessageHeaders(MessageContext msgCtx, AMQPTransportInfo amqpTransportInfo, Session session, boolean waitForResponse, DeliveryProperties deliveryProps, AMQP.BasicProperties msgProps) {
+	private void fillMessageHeaders(MessageContext msgCtx, AMQPTransportInfo amqpTransportInfo, boolean waitForResponse, AMQP.BasicProperties msgProps) {
 		// Routing info
 		deliveryProps.setExchange(amqpTransportInfo.getDestination().getExchangeName());
 		deliveryProps.setRoutingKey(amqpTransportInfo.getDestination().getRoutingKey());
@@ -213,33 +214,23 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 
 				String name = (String) iter.next();
 
-				if (AMQPConstants.AMQP_CORELATION_ID.equals(name)) {
+				if (AMQPConstants.AMQP_CORRELATION_ID.equals(name)) {
 					msgProps=msgProps.builder().correlationId((String) headerMap.get(AMQPConstants.AMQP_CORRELATION_ID)).build();
 					// If it's request/response, then we need to fill in
-					// corelation id and reply to properties
+					// correlation id and reply to properties
 				} else if (AMQPConstants.AMQP_DELIVERY_MODE.equals(name)) {
 					Object o = headerMap.get(AMQPConstants.AMQP_DELIVERY_MODE);
-					if (o instanceof Short) {
-						deliveryProps.setDeliveryMode(((Short) o).shortValue());
-					} else if (o instanceof Integer) {
-						deliveryProps.setDeliveryMode(((Integer) o).shortValue());
-					} else if (o instanceof String) {
-						try {
-							deliveryProps.setDeliveryMode(Short.parseShort((String) o));
-						} catch (NumberFormatException nfe) {
-							log.warn("Invalid delivery mode ignored : " + o, nfe);
-						}
-					} else {
-						log.warn("Invalid delivery mode ignored : " + o);
-					}
+					String val=""+o;
+					msgProps=msgProps.builder().deliveryMode(Integer.parseInt(val)).build();
 				} else if (AMQPConstants.AMQP_EXPIRATION.equals(name)) {
-					deliveryProps.setExpiration(Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_EXPIRATION)));
+					msgProps=msgProps.builder().expiration((String) headerMap.get(AMQPConstants.AMQP_EXPIRATION)).build();
 				} else if (AMQPConstants.AMQP_MESSAGE_ID.equals(name)) {
 					msgProps=msgProps.builder().messageId((String) headerMap.get(AMQPConstants.AMQP_MESSAGE_ID)).build();
 				} else if (AMQPConstants.AMQP_PRIORITY.equals(name)) {
-					deliveryProps.setPriority(Short.parseShort((String) headerMap.get(AMQPConstants.AMQP_PRIORITY)));
+					msgProps=msgProps.builder().priority(Integer.parseInt(((String) headerMap.get(AMQPConstants.AMQP_PRIORITY)))).build();
 				} else if (AMQPConstants.AMQP_TIMESTAMP.equals(name)) {
-					deliveryProps.setTimestamp(Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_TIMESTAMP)));
+					long timestamp=Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_TIMESTAMP));
+					msgProps=msgProps.builder().timestamp(new Date(timestamp)).build();
 				} else {
 					// custom app props
 					Object value = headerMap.get(name);
@@ -316,18 +307,24 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 	}
 
-	private void waitForResponseAndProcess(Session session, AMQP.BasicProperties msgProps, MessageContext msgCtx) throws AxisFault {
-
+	private void waitForResponseAndProcess(Channel chan, AMQPMessage msg, MessageContext msgCtx) throws AxisFault {
 		long timeout = AMQPConstants.DEFAULT_AMQP_TIMEOUT;
 		String waitReply = (String) msgCtx.getProperty(AMQPConstants.AMQP_WAIT_REPLY);
+		AMQP.BasicProperties msg_props=null;
+		Envelope msg_env=null;
+		
+		msg_props=msg.getProperties();
+		msg_env=msg.getEnvelope();
+				
 		if (waitReply != null) {
 			timeout = Long.valueOf(waitReply).longValue();
 		}
 		// We are using the routing key (which is the queue name) as the
 		// destination
-		String destination = msgProps.getReplyTo().getRoutingKey();
-		MessageManager listener = new MessageManager(session, destination, msgProps.getCorrelationId());
-		session.messageSubscribe(msgProps.getReplyTo().getRoutingKey(), destination, Session.TRANSFER_CONFIRM_MODE_REQUIRED, Session.TRANSFER_ACQUIRE_MODE_PRE_ACQUIRE, new MessagePartListenerAdapter(listener), null, Option.NO_OPTION);
+		String destination = msg_env.getRoutingKey();
+		
+		MessageManager listener = new MessageManager(chan, destination, msg_props.getCorrelationId());
+		chan.messageSubscribe(msg_env.getRoutingKey(), destination, Session.TRANSFER_CONFIRM_MODE_REQUIRED, Session.TRANSFER_ACQUIRE_MODE_PRE_ACQUIRE, new MessagePartListenerAdapter(listener), null, Option.NO_OPTION);
 
 		AMQPMessage reply = listener.receive(timeout);
 
@@ -335,7 +332,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 			processSyncResponse(msgCtx, reply);
 
 		} else {
-			log.warn("Did not receive a response within " + timeout + " ms to destination : " + msgProps.getReplyTo().getRoutingKey() + " with correlation ID : " + msgProps.getCorrelationId());
+			log.warn("Did not receive a response within " + timeout + " ms to destination : " + msg_props.getReplyTo().getRoutingKey() + " with correlation ID : " + msg_props.getCorrelationId());
 		}
 	}
 

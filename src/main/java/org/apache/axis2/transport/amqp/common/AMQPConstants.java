@@ -24,6 +24,8 @@ public class AMQPConstants {
      */
     public static final String AMQP_PREFIX = "amqp:";
 
+    public static final String TRANSPORT_AMQP = "amqp";
+
     //------------------------------------ defaults / constants ------------------------------------
     /**
      * The local (Axis2) JMS connection factory name of the default connection
