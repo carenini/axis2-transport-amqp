@@ -187,7 +187,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		return connectionFactory;
 	}
 
-	public AMQPConnectionFactory getJmsConnectionFactory() {
+	public AMQPConnectionFactory getAmqpConnectionFactory() {
 		return amqpConnectionFactory;
 	}
 
@@ -290,6 +290,11 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	}
 
 	public Object getConnectionURL() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public Destination getReplyDestination(String replyDestName) {
 		// TODO Auto-generated method stub
 		return null;
 	}

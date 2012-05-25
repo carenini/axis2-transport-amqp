@@ -34,8 +34,6 @@ import org.apache.axis2.transport.base.BaseConstants;
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
 
-import javax.transaction.*;
-
 /**
  * Performs the actual sending of a JMS message, and the subsequent committing of a JTA transaction
  * (if requested) or the local session transaction, if used. An instance of this class is unique
@@ -193,6 +191,11 @@ public class AMQPMessageSender {
         }
         return null;
     }
+
+	public Channel getChannel() {
+		// TODO Auto-generated method stub
+		return chan;
+	}
 
 
 }

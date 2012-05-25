@@ -25,7 +25,6 @@ public class IncomingMessageHandler implements Runnable {
     private AMQPMessage message=null;
     
 	public IncomingMessageHandler(AMQPEndpoint ep, AMQPMessage msg)  {
-		// TODO Auto-generated constructor stub
 		this.body = body;
 		this.consumerTag=msg.getConsumerTag();
 		this.envelope=msg.getEnvelope();
@@ -94,7 +93,8 @@ public class IncomingMessageHandler implements Runnable {
 
 		} catch (AxisFault e) {
 			e.printStackTrace();
-		} finally {
+		} /* FIXME add transactions!
+		finally {
 
 			Object o = msgContext.getProperty(BaseConstants.SET_ROLLBACK_ONLY);
 			if (o != null) {
@@ -103,6 +103,6 @@ public class IncomingMessageHandler implements Runnable {
 					throw new RollbackRequestException();
 				}
 			}
-		}
+		}*/
 	}
 }

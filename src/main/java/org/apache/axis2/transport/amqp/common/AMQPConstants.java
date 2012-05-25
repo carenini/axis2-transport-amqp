@@ -201,11 +201,11 @@ public class AMQPConstants {
     /**
      * The message type indicating a BytesMessage. See {@link JMS_MESSAGE_TYPE}
      */
-    public static final String JMS_BYTE_MESSAGE = "JMS_BYTE_MESSAGE";
+    public static final String AMQP_BYTE_MESSAGE = "AMQP_BYTE_MESSAGE";
     /**
      * The message type indicating a TextMessage. See {@link JMS_MESSAGE_TYPE}
      */
-    public static final String JMS_TEXT_MESSAGE = "JMS_TEXT_MESSAGE";
+    public static final String AMQP_TEXT_MESSAGE = "AMQP_TEXT_MESSAGE";
     /**
      * A MessageContext property or client Option indicating the time to wait for a response JMS message
      */

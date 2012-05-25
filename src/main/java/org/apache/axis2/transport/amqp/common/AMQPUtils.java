@@ -29,8 +29,6 @@ import org.apache.axis2.format.TextMessageBuilderAdapter;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.axis2.transport.TransportUtils;
-import org.apache.axis2.transport.amqp.common.iowrappers.BytesMessageDataSource;
-import org.apache.axis2.transport.amqp.common.iowrappers.BytesMessageInputStream;
 import org.apache.axis2.transport.amqp.in.AMQPListener;
 import org.apache.axis2.transport.base.BaseUtils;
 
@@ -41,6 +39,7 @@ import com.rabbitmq.client.Envelope;
 import javax.mail.internet.ContentType;
 import javax.mail.internet.ParseException;
 
+import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.util.*;
 
@@ -50,8 +49,7 @@ import java.util.*;
 public class AMQPUtils extends BaseUtils {
 
 	private static final Log log = LogFactory.getLog(AMQPUtils.class);
-	private static final Class<?>[] NOARGS = new Class<?>[] {};
-	private static final Object[] NOPARMS = new Object[] {};
+
 
 	/**
 	 * Should this service be enabled over the AMQP transport?
@@ -158,9 +156,9 @@ public class AMQPUtils extends BaseUtils {
 			msgContext.setProperty(Constants.Configuration.CHARACTER_SET_ENCODING, charSetEnc);
 
 			if (builder instanceof DataSourceMessageBuilder) {
-				documentElement = ((DataSourceMessageBuilder) builder).processDocument(new BytesMessageDataSource(message), contentType, msgContext);
+				documentElement = ((DataSourceMessageBuilder) builder).processDocument(new ByteArrayInputStream(message.getBody()), contentType, msgContext);
 			} else {
-				documentElement = builder.processDocument(new BytesMessageInputStream(message), contentType, msgContext);
+				documentElement = builder.processDocument(new ByteArrayInputStream(message.getBody()), contentType, msgContext);
 			}
 		} else if (contentType.equals("text/plain")) {
 			TextMessageBuilder textMessageBuilder;
@@ -332,6 +330,42 @@ public class AMQPUtils extends BaseUtils {
 	}
 
 
+    /**
+     * Get the EPR for the given AMQP details
+     * the form of the URL is
+     * uri="amqp:/direct?routingKey=SimpleStockQuoteService&amp;connectionURL=qpid:virtualhost=test;client_id=foo@tcp:myhost.com:5672"
+     *
+     * Creates the EPR with the primary binding
+     *
+     */
+    public static String getEPR(List<Destination> list, String url) {
+
+        String epr = null;
+        for (Destination binding:list){
+
+            if (binding.isPrimary()){
+                StringBuffer sb = new StringBuffer();
+                sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(binding.getExchangeType());
+                sb.append("/").append(binding.getExchangeName());
+                sb.append("?").append(AMQPConstants.BINDING_ROUTING_KEY_ATTR).append("=").append(binding.getRoutingKey());
+                sb.append("&amp;").append("connectionURL=").append(url);
+                epr = sb.toString();
+            }
+        }
+
+        // If no primary is defined just get the first
+        if(epr == null){
+            Destination binding = list.get(0);
+            StringBuffer sb = new StringBuffer();
+            sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(binding.getExchangeType());
+            sb.append("/").append(binding.getExchangeName());
+            sb.append("?").append(AMQPConstants.BINDING_ROUTING_KEY_ATTR).append("=").append(binding.getRoutingKey());
+            sb.append("&amp;").append("connectionURL=").append(url);
+            epr = sb.toString();
+        }
+
+        return epr;
+    }
 
 
 	/**

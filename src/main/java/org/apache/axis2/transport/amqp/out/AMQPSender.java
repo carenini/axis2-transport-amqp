@@ -19,7 +19,6 @@ import org.apache.axiom.om.OMOutputFormat;
 import org.apache.axiom.om.OMElement;
 import org.apache.axiom.om.OMText;
 import org.apache.axiom.om.OMNode;
-import org.apache.axiom.om.util.UUIDGenerator;
 import org.apache.axis2.AxisFault;
 import org.apache.axis2.Constants;
 import org.apache.axis2.context.MessageContext;
@@ -28,6 +27,9 @@ import org.apache.axis2.description.TransportOutDescription;
 import org.apache.axis2.transport.TransportUtils;
 import org.apache.axis2.transport.MessageFormatter;
 import org.apache.axis2.transport.OutTransportInfo;
+import org.apache.axis2.transport.base.*;
+import org.apache.axis2.transport.base.streams.WriterOutputStream;
+import org.apache.axis2.transport.http.HTTPConstants;
 import org.apache.axis2.transport.amqp.common.AMQPConnectionFactory;
 import org.apache.axis2.transport.amqp.common.AMQPConnectionFactoryManager;
 import org.apache.axis2.transport.amqp.common.AMQPConstants;
@@ -35,15 +37,10 @@ import org.apache.axis2.transport.amqp.common.AMQPException;
 import org.apache.axis2.transport.amqp.common.AMQPMessage;
 import org.apache.axis2.transport.amqp.common.AMQPTransportInfo;
 import org.apache.axis2.transport.amqp.common.AMQPUtils;
-import org.apache.axis2.transport.base.*;
-import org.apache.axis2.transport.base.streams.WriterOutputStream;
-import org.apache.axis2.transport.http.HTTPConstants;
-
+import org.apache.axis2.transport.amqp.common.Destination;
 
 import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Envelope;
 
 import javax.activation.DataHandler;
@@ -56,13 +53,18 @@ import java.nio.charset.UnsupportedCharsetException;
 import java.util.*;
 
 /**
- * The TransportSender for JMS
+ * The TransportSender for AMQP
  */
 public class AMQPSender extends AbstractTransportSender implements ManagementSupport {
 
 	public static final String TRANSPORT_NAME = AMQPConstants.TRANSPORT_AMQP;
 
-	/** The JMS connection factory manager to be used when sending messages out */
+	/**
+	 * The AMQP connection factory manager to be used when sending messages out
+	 * 
+	 * @uml.property name="connFacManager"
+	 * @uml.associationEnd readOnly="true"
+	 */
 	private AMQPConnectionFactoryManager connFacManager;
 
 	/**
@@ -84,20 +86,20 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	}
 
 	/**
-	 * Get corresponding connection factory defined within the transport
+	 * Get corresponding AMQP connection factory defined within the transport
 	 * sender for the transport-out information - usually constructed from a
 	 * targetEPR
 	 * 
 	 * @param trpInfo
 	 *            the transport-out information
-	 * @return the corresponding JMS connection factory, if any
+	 * @return the corresponding AMQP connection factory, if any
 	 */
 	private AMQPConnectionFactory getAMQPConnectionFactory(AMQPTransportInfo trpInfo) {
 		Map<String, String> props = trpInfo.getProperties();
 		if (trpInfo.getProperties() != null) {
-			String amqpConnectionFactoryName = props.get(AMQPConstants.PARAM_AMQP_CONFAC);
-			if (amqpConnectionFactoryName != null) {
-				return connFacManager.getAMQPConnectionFactory(amqpConnectionFactoryName);
+			String jmsConnectionFactoryName = props.get(AMQPConstants.PARAM_AMQP_CONFAC);
+			if (jmsConnectionFactoryName != null) {
+				return connFacManager.getAMQPConnectionFactory(jmsConnectionFactoryName);
 			} else {
 				return connFacManager.getAMQPConnectionFactory(props);
 			}
@@ -107,258 +109,383 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	}
 
 	/**
-	 * Needs a more robust strategy to cache connections and sessions For
-	 * efficiency I assume that the reply to exchange,queue and the binding
-	 * already exists.
-	 * 
-	 * For synchrouns request/reponse a temp queue will be create and bound to
-	 * the direct exchange.
+	 * Performs the actual sending of the AMQP message
 	 */
 	@Override
-	public void sendMessage(MessageContext msgCtx, String targetEPR, OutTransportInfo outTransportInfo) throws AxisFault {
+	public void sendMessage(MessageContext msgCtx, String targetAddress, OutTransportInfo outTransportInfo) throws AxisFault {
 
-		AMQPTransportInfo amqpTransportInfo = null;
-		
-		// If targetEPR is not null, determine the addressing info from it
-		if (targetEPR != null) {
-			amqpTransportInfo = new AMQPTransportInfo(targetEPR);
-		}
-		// If not try to get the addressing info from the transport description
-		else if (outTransportInfo != null && outTransportInfo instanceof AMQPTransportInfo) {
-			amqpTransportInfo = (AMQPTransportInfo) outTransportInfo;
-		}
+		AMQPConnectionFactory conFac = null;
+		AMQPTransportInfo amqpOut = null;
+		AMQPMessageSender messageSender = null;
 
-		if (_connectionDetails.containsKey(amqpTransportInfo.getConnectionURL())) {
-			conDetails = _connectionDetails.get(amqpTransportInfo.getConnectionURL());
-		} else {
-			// else create a new connection
-			Connection con = Client.createConnection();
-			try {
-				con.connect(amqpTransportInfo.getConnectionURL());
-			} catch (Exception e) {
-				throw new AMQPException("Error creating a connection to the broker", e);
+		if (targetAddress != null) {
+			amqpOut = new AMQPTransportInfo(targetAddress);
+			// do we have a definition for a connection factory to use for this
+			// address?
+			conFac = getAMQPConnectionFactory(amqpOut);
+
+			if (conFac != null) {
+				messageSender = new AMQPMessageSender(conFac, targetAddress);
+
+			} else {
+					messageSender = amqpOut.createAMQPSender();
 			}
-			_connectionDetails.put(amqpTransportInfo.getConnectionURL(), new ConnectionDetails(con));
+
+		} else if (outTransportInfo != null && outTransportInfo instanceof AMQPTransportInfo) {
+
+			amqpOut = (AMQPTransportInfo) outTransportInfo;
+				messageSender = amqpOut.createAMQPSender();
 		}
 
-		if (conDetails != null) {
-			session = conDetails.getSession();
+		// The message property to be used to send the content type is
+		// determined by
+		// the out transport info, i.e. either from the EPR if we are sending a
+		// request,
+		// or, if we are sending a response, from the configuration of the
+		// service that
+		// received the request). The property name can be overridden by a
+		// message
+		// context property.
+		String contentTypeProperty = (String) msgCtx.getProperty(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
+		if (contentTypeProperty == null) {
+			contentTypeProperty = amqpOut.getContentTypeProperty();
 		}
 
-		byte[] message = null;
-		try {
-			message = createMessageData(msgCtx);
-		} catch (AMQPException e) {
-			handleException("Error creating a message from the axis message context", e);
+		// need to synchronize as Sessions are not thread safe
+		synchronized (messageSender.getSession()) {
+			try {
+				sendOverAMQP(msgCtx, messageSender, contentTypeProperty, jmsConnectionFactory, amqpOut);
+			} finally {
+				messageSender.close();
+			}
 		}
+	}
 
+	/**
+	 * Perform actual sending of the AMQP message
+	 */
+	private void sendOverAMQP(MessageContext msgCtx, AMQPMessageSender messageSender, String contentTypeProperty, AMQPConnectionFactory amqpConnectionFactory, AMQPTransportInfo amqpOut) throws AxisFault {
+
+		// convert the axis message context into a AMQP Message that we can send
+		// over AMQP
+		AMQPMessage message = null;
+		AMQP.BasicProperties msg_prop=null;
+		Envelope msg_env=null;
+		String correlationId = null;
 		// should we wait for a synchronous response on this same thread?
 		boolean waitForResponse = waitForSynchronousResponse(msgCtx);
-		AMQP.BasicProperties.Builder prop_builder = new AMQP.BasicProperties.Builder();
-		AMQP.BasicProperties msgProps = bob.build();
-		DeliveryProperties deliveryProps = new DeliveryProperties();
-		fillMessageHeaders(msgCtx, amqpTransportInfo, session, waitForResponse, deliveryProps, msgProps);
 
-		synchronized (session) {
-			session.header(msgProps, deliveryProps);
-			session.data(message);
-			session.endData();
+		message = createMessage(msgCtx, contentTypeProperty);
+		msg_env=message.getEnvelope();
+		msg_prop=message.getProperties();
+		Destination replyDestination = amqpOut.getReplyDestination();
+
+		// if this is a synchronous out-in, prepare to listen on the response
+		// destination
+		if (waitForResponse) {
+
+			String replyDestName = (String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO);
+			if (replyDestName == null && amqpConnectionFactory != null) {
+				replyDestName = amqpConnectionFactory.getReplyToDestination();
+			}
+
+			String replyDestType = (String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO_TYPE);
+			if (replyDestType == null && amqpConnectionFactory != null) {
+				replyDestType = amqpConnectionFactory.getReplyDestinationType();
+			}
+
+			if (replyDestName != null) {
+				if (amqpConnectionFactory != null) {
+					replyDestination = amqpConnectionFactory.getDestination(replyDestName, replyDestType);
+				} else {
+					replyDestination = amqpOut.getReplyDestination(replyDestName);
+				}
+			}
+			replyDestination = AMQPUtils.setReplyDestination(replyDestination, messageSender.getSession(), message);
 		}
+
+		messageSender.send(message, msgCtx);
+		metrics.incrementMessagesSent(msgCtx);
+
+		metrics.incrementBytesSent(msgCtx, message.getProperties().getBodySize());
 
 		// if we are expecting a synchronous response back for the message sent
 		// out
 		if (waitForResponse) {
-			waitForResponseAndProcess(session, msgProps, msgCtx);
+			// TODO
+			// ********************************************************************************
+			// TODO **** replace with asynchronous polling via a poller task to
+			// process this *******
+			// information would be given. Then it should poll (until timeout)
+			// the
+			// requested destination for the response message and inject it from
+			// a
+			// asynchronous worker thread
+			
+			messageSender.getConnection().start(); // multiple calls are safely ignored
+			correlationId = msg_prop.getMessageId();
+
+			// We assume here that the response uses the same message property to specify the content type of the message.
+			waitForResponseAndProcess(messageSender.getSession(), replyDestination, msgCtx, correlationId, contentTypeProperty);
+			// TODO
+			// ********************************************************************************
 		}
 	}
 
-	private void fillMessageHeaders(MessageContext msgCtx, AMQPTransportInfo amqpTransportInfo, boolean waitForResponse, AMQP.BasicProperties msgProps) {
-		// Routing info
-		deliveryProps.setExchange(amqpTransportInfo.getDestination().getExchangeName());
-		deliveryProps.setRoutingKey(amqpTransportInfo.getDestination().getRoutingKey());
+	/**
+	 * Create a Consumer for the reply destination and wait for the response AMQP
+	 * message synchronously. If a message arrives within the specified time
+	 * interval, process it through Axis2
+	 * 
+	 * @param chan
+	 *            the session to use to listen for the response
+	 * @param replyDestination
+	 *            the AMQP reply Destination
+	 * @param msgCtx
+	 *            the outgoing message for which we are expecting the response
+	 * @param contentTypeProperty
+	 *            the message property used to determine the content type of the
+	 *            response message
+	 * @throws AxisFault
+	 *             on error
+	 */
+	private void waitForResponseAndProcess(Channel chan, Destination replyDestination, MessageContext msgCtx, String correlationId, String contentTypeProperty) throws AxisFault {
 
-		// Content type
-		OMOutputFormat format = BaseUtils.getOMOutputFormat(msgCtx);
-		MessageFormatter messageFormatter = null;
-		try {
-			messageFormatter = TransportUtils.getMessageFormatter(msgCtx);
-		} catch (AxisFault axisFault) {
-			throw new AMQPException("Unable to get the message formatter to use");
-		}
+		//try {
+			MessageConsumer consumer;
+			consumer = AMQPUtils.createConsumer(chan, replyDestination, "AMQPCorrelationID = '" + correlationId + "'");
 
-		String contentType = messageFormatter.getContentType(msgCtx, format, msgCtx.getSoapAction());
-		msgProps=msgProps.builder().contentType(contentType).build();
-
-		// Custom properties - SOAP ACTION
-		Map<String, Object> props = new HashMap<String, Object>();
-
-		if (msgCtx.isServerSide()) {
-			// set SOAP Action as a property on the message
-			props.put(BaseConstants.SOAPACTION, (String) msgCtx.getProperty(BaseConstants.SOAPACTION));
-
-		} else {
-			String action = msgCtx.getOptions().getAction();
-			if (action != null) {
-				props.put(BaseConstants.SOAPACTION, action);
+			// how long are we willing to wait for the sync response
+			long timeout = AMQPConstants.DEFAULT_AMQP_TIMEOUT;
+			String waitReply = (String) msgCtx.getProperty(AMQPConstants.AMQP_WAIT_REPLY);
+			if (waitReply != null) {
+				timeout = Long.valueOf(waitReply).longValue();
 			}
-		}
 
-		msgProps=msgProps.builder().headers(props).build();
-
-		// transport headers
-		Map headerMap = (Map) msgCtx.getProperty(MessageContext.TRANSPORT_HEADERS);
-
-		if (headerMap != null) {
-			Iterator iter = headerMap.keySet().iterator();
-			while (iter.hasNext()) {
-
-				String name = (String) iter.next();
-
-				if (AMQPConstants.AMQP_CORRELATION_ID.equals(name)) {
-					msgProps=msgProps.builder().correlationId((String) headerMap.get(AMQPConstants.AMQP_CORRELATION_ID)).build();
-					// If it's request/response, then we need to fill in
-					// correlation id and reply to properties
-				} else if (AMQPConstants.AMQP_DELIVERY_MODE.equals(name)) {
-					Object o = headerMap.get(AMQPConstants.AMQP_DELIVERY_MODE);
-					String val=""+o;
-					msgProps=msgProps.builder().deliveryMode(Integer.parseInt(val)).build();
-				} else if (AMQPConstants.AMQP_EXPIRATION.equals(name)) {
-					msgProps=msgProps.builder().expiration((String) headerMap.get(AMQPConstants.AMQP_EXPIRATION)).build();
-				} else if (AMQPConstants.AMQP_MESSAGE_ID.equals(name)) {
-					msgProps=msgProps.builder().messageId((String) headerMap.get(AMQPConstants.AMQP_MESSAGE_ID)).build();
-				} else if (AMQPConstants.AMQP_PRIORITY.equals(name)) {
-					msgProps=msgProps.builder().priority(Integer.parseInt(((String) headerMap.get(AMQPConstants.AMQP_PRIORITY)))).build();
-				} else if (AMQPConstants.AMQP_TIMESTAMP.equals(name)) {
-					long timestamp=Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_TIMESTAMP));
-					msgProps=msgProps.builder().timestamp(new Date(timestamp)).build();
-				} else {
-					// custom app props
-					Object value = headerMap.get(name);
-					props.put(name, value);
-				}
+			if (log.isDebugEnabled()) {
+				log.debug("Waiting for a maximum of " + timeout + "ms for a response message to destination : " + replyDestination + " with AMQP correlation ID : " + correlationId);
 			}
-		}
 
-		/*
-		 * For efficiency I assume that the reply to exchange and destination is
-		 * already created If the reply is for the same service, then this
-		 * should be the queue that the service is listening to. Blindly
-		 * creating these exchanges,queues and bindings is sub optimal and can
-		 * be avoid if the administrator creates the nessacery exchanges,queues
-		 * and bindings before hand.
-		 * 
-		 * If the service hasn't specify and it's a request/reply MEP then a
-		 * temporary queue (which is auto-deleted) is created and bound to the
-		 * amq.direct exchange.
-		 */
-		if (msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO_EXCHANGE_NAME) != null) {
-			String replyExchangeName = (String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO_EXCHANGE_NAME);
-			String replyRoutingKey = msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO_ROUTING_KEY) != null ? (String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO_ROUTING_KEY) : null;
+			AMQPMessage reply = consumer.receive(timeout);
 
-			// for fannout exchange or some other custom exchange, the routing
-			// key maybe null
-			msgProps=msgProps.builder().replyTo(new ReplyTo(replyExchangeName, replyRoutingKey)).build();
-		}
+			if (reply != null) {
+				// update transport level metrics
+				metrics.incrementMessagesReceived();
+				metrics.incrementBytesReceived(reply.getProperties().getBodySize());
 
-		// If it's request/response, then we need to fill in reply to properties
-		// and correlation_id
-		if (waitForResponse) {
-
-			if (waitForResponse && msgProps.getCorrelationId() == null) {
-				if (msgCtx.getProperty(AMQPConstants.AMQP_CORELATION_ID) != null) {
-					msgProps=msgProps.builder().correlationId((String) msgCtx.getProperty(AMQPConstants.AMQP_CORELATION_ID)).build();
-				} else {
-					msgProps=msgProps.builder().correlationId(UUIDGenerator.getUUID()).build();
+				try {
+					processSyncResponse(msgCtx, reply, contentTypeProperty);
+					metrics.incrementMessagesReceived();
+				} catch (AxisFault e) {
+					metrics.incrementFaultsReceiving();
+					throw e;
 				}
 
+			} else {
+				log.warn("Did not receive a AMQP response within " + timeout + " ms to destination : " + replyDestination + " with AMQP correlation ID : " + correlationId);
+				metrics.incrementTimeoutsReceiving();
 			}
 
-			if (msgProps.getReplyTo() == null) {
-				// We need to use a temp queue here.
-				String tempQueueName = "Queue_" + msgProps.getCorrelationId();
-				synchronized (session) {
-					session.queueDeclare(tempQueueName, null, null, Option.AUTO_DELETE, Option.EXCLUSIVE);
-					session.queueBind(tempQueueName, "amq.direct", tempQueueName, null);
-					session.sync();
-				}
-				msgProps.replyTo(new ReplyTo("amq.direct", tempQueueName));
-			}
-		}
+		/*} catch (AMQPException e) {
+			metrics.incrementFaultsReceiving();
+			handleException("Error creating a consumer, or receiving a synchronous reply " + "for outgoing MessageContext ID : " + msgCtx.getMessageID() + " and reply Destination : " + replyDestination, e);
+		}*/
 	}
 
-	private byte[] createMessageData(MessageContext msgContext) {
-		OMOutputFormat format = BaseUtils.getOMOutputFormat(msgContext);
-		MessageFormatter messageFormatter = null;
-		try {
-			messageFormatter = TransportUtils.getMessageFormatter(msgContext);
-		} catch (AxisFault axisFault) {
-			throw new AMQPException("Unable to get the message formatter to use", axisFault);
-		}
+	/**
+	 * Create a AMQP Message from the given MessageContext and using the given
+	 * session
+	 * 
+	 * @param msgContext
+	 *            the MessageContext
+	 * @param chan
+	 *            the AMQP session
+	 * @param contentTypeProperty
+	 *            the message property to be used to store the content type
+	 * @return a AMQP message from the context and session
+	 * @throws AMQPException
+	 *             on exception
+	 * @throws AxisFault
+	 *             on exception
+	 */
+	private AMQPMessage createMessage(MessageContext msgContext, String contentTypeProperty) throws AMQPException, AxisFault {
 
-		String contentType = messageFormatter.getContentType(msgContext, format, msgContext.getSoapAction());
-
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		try {
-			messageFormatter.writeTo(msgContext, format, baos, true);
-			baos.flush();
-			return baos.toByteArray();
-		} catch (IOException e) {
-			throw new AMQPException("IO Error while creating message", e);
-		}
-	}
-
-	private void waitForResponseAndProcess(Channel chan, AMQPMessage msg, MessageContext msgCtx) throws AxisFault {
-		long timeout = AMQPConstants.DEFAULT_AMQP_TIMEOUT;
-		String waitReply = (String) msgCtx.getProperty(AMQPConstants.AMQP_WAIT_REPLY);
-		AMQP.BasicProperties msg_props=null;
+		AMQPMessage message = null;
 		Envelope msg_env=null;
+		AMQP.BasicProperties msg_prop=null;
+		ByteArrayOutputStream bos=null;
+		OutputStream out=null;
+		byte[] msg_payload=null;
+		String contentType = null;
+		String payloadType = null;
+		Map<String, Object> headers = null;
+
+		StringWriter sw=null;
+		String msgType = getProperty(msgContext, AMQPConstants.AMQP_MESSAGE_TYPE);
 		
-		msg_props=msg.getProperties();
-		msg_env=msg.getEnvelope();
-				
-		if (waitReply != null) {
-			timeout = Long.valueOf(waitReply).longValue();
+		message=new AMQPMessage();
+		// check the first element of the SOAP body, do we have content wrapped
+		// using the
+		// default wrapper elements for binary
+		// (BaseConstants.DEFAULT_BINARY_WRAPPER) or
+		// text (BaseConstants.DEFAULT_TEXT_WRAPPER) ? If so, do not create SOAP
+		// messages
+		// for AMQP but just get the payload in its native format
+		 
+		payloadType=guessMessageType(msgContext);
+		bos=new ByteArrayOutputStream();
+		
+		if (payloadType == null) {
+
+			OMOutputFormat format = BaseUtils.getOMOutputFormat(msgContext);
+			MessageFormatter messageFormatter = null;
+			try {
+				messageFormatter = TransportUtils.getMessageFormatter(msgContext);
+			} catch (AxisFault axisFault) {
+				throw new AMQPException("Unable to get the message formatter to use");
+			}
+
+			contentType=messageFormatter.getContentType(msgContext, format, msgContext.getSoapAction());
+
+			boolean useBytesMessage = msgType != null && AMQPConstants.AMQP_BYTE_MESSAGE.equals(msgType) || contentType.indexOf(HTTPConstants.HEADER_ACCEPT_MULTIPART_RELATED) > -1;
+
+			if (useBytesMessage) {
+				sw = null;
+				out = bos;
+			} else {
+				sw = new StringWriter();
+				try {
+					out = new WriterOutputStream(sw, format.getCharSetEncoding());
+				} catch (UnsupportedCharsetException ex) {
+					handleException("Unsupported encoding " + format.getCharSetEncoding(), ex);
+					return null;
+				}
+			}
+
+			try {
+				messageFormatter.writeTo(msgContext, format, out, true);
+				out.close();
+			} catch (IOException e) {
+				handleException("IO Error while creating BytesMessage", e);
+			}
+
+			if (!useBytesMessage) message.setBody(sw.toString().getBytes());
+			if (contentTypeProperty != null) {
+				headers=msg_prop.getHeaders();
+				if (headers==null) headers=new HashMap<String, Object>();
+				headers.put(contentTypeProperty, contentType);
+				msg_prop=msg_prop.builder().headers(headers).build();
+			}
+			
+
+		} else if (AMQPConstants.AMQP_BYTE_MESSAGE.equals(payloadType)) {
+			OMElement wrapper = msgContext.getEnvelope().getBody().getFirstChildWithName(BaseConstants.DEFAULT_BINARY_WRAPPER);
+			OMNode omNode = wrapper.getFirstOMChild();
+			if (omNode != null && omNode instanceof OMText) {
+				Object dh = ((OMText) omNode).getDataHandler();
+				if (dh != null && dh instanceof DataHandler) {
+					try {
+						((DataHandler) dh).writeTo(bos);
+						message.setBody(bos.toByteArray());
+					} catch (IOException e) {
+						handleException("Error serializing binary content of element : " + BaseConstants.DEFAULT_BINARY_WRAPPER, e);
+					}
+				}
+			}
+		} else if (AMQPConstants.AMQP_TEXT_MESSAGE.equals(payloadType)) {
+			message.setBody(msgContext.getEnvelope().getBody().getFirstChildWithName(BaseConstants.DEFAULT_TEXT_WRAPPER).getText().getBytes());
 		}
-		// We are using the routing key (which is the queue name) as the
-		// destination
-		String destination = msg_env.getRoutingKey();
-		
-		MessageManager listener = new MessageManager(chan, destination, msg_props.getCorrelationId());
-		chan.messageSubscribe(msg_env.getRoutingKey(), destination, Session.TRANSFER_CONFIRM_MODE_REQUIRED, Session.TRANSFER_ACQUIRE_MODE_PRE_ACQUIRE, new MessagePartListenerAdapter(listener), null, Option.NO_OPTION);
 
-		AMQPMessage reply = listener.receive(timeout);
+		// set the AMQP correlation ID if specified
+		String correlationId = getProperty(msgContext, AMQPConstants.AMQP_CORRELATION_ID);
+		if (correlationId == null && msgContext.getRelatesTo() != null) {
+			correlationId = msgContext.getRelatesTo().getValue();
+		}
 
-		if (reply != null) {
-			processSyncResponse(msgCtx, reply);
+		msg_prop=message.getProperties();
+		if (correlationId != null) {
+			msg_prop=msg_prop.builder().correlationId(correlationId).build();
+		}
 
+		if (msgContext.isServerSide()) {
+			// set SOAP Action as a property on the AMQP message
+			setProperty(message, msgContext, BaseConstants.SOAPACTION);
 		} else {
-			log.warn("Did not receive a response within " + timeout + " ms to destination : " + msg_props.getReplyTo().getRoutingKey() + " with correlation ID : " + msg_props.getCorrelationId());
+			String action = msgContext.getOptions().getAction();
+			if (action != null) {
+				headers=msg_prop.getHeaders();
+				if (headers==null) headers=new HashMap<String, Object>();
+				headers.put(BaseConstants.SOAPACTION, action);
+				msg_prop=msg_prop.builder().headers(headers).build();
+			}
 		}
+
+		AMQPUtils.setTransportHeaders(msgContext, message);
+		return message;
 	}
 
-	private void processSyncResponse(MessageContext outMsgCtx, AMQPMessage message) throws AxisFault {
+	/**
+	 * Guess the message type to use for AMQP looking at the message contexts'
+	 * envelope
+	 * 
+	 * @param msgContext
+	 *            the message context
+	 * @return AMQPConstants.AMQP_BYTE_MESSAGE or AMQPConstants.AMQP_TEXT_MESSAGE
+	 *         or null
+	 */
+	private String guessMessageType(MessageContext msgContext) {
+		OMElement firstChild = msgContext.getEnvelope().getBody().getFirstElement();
+		if (firstChild != null) {
+			if (BaseConstants.DEFAULT_BINARY_WRAPPER.equals(firstChild.getQName())) {
+				return AMQPConstants.AMQP_BYTE_MESSAGE;
+			} else if (BaseConstants.DEFAULT_TEXT_WRAPPER.equals(firstChild.getQName())) {
+				return AMQPConstants.AMQP_TEXT_MESSAGE;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Creates an Axis MessageContext for the received AMQP message and sets up
+	 * the transports and various properties
+	 * 
+	 * @param outMsgCtx
+	 *            the outgoing message for which we are expecting the response
+	 * @param message
+	 *            the AMQP response message received
+	 * @param contentTypeProperty
+	 *            the message property used to determine the content type of the
+	 *            response message
+	 * @throws AxisFault
+	 *             on error
+	 */
+	private void processSyncResponse(MessageContext outMsgCtx, AMQPMessage message, String contentTypeProperty) throws AxisFault {
 
 		MessageContext responseMsgCtx = createResponseMessageContext(outMsgCtx);
 
 		// load any transport headers from received message
-		Map map = AMQPUtils.getTransportHeaders(message);
-		responseMsgCtx.setProperty(MessageContext.TRANSPORT_HEADERS, map);
+		AMQPUtils.loadTransportHeaders(message, responseMsgCtx);
 
-		// workaround for Axis2 TransportUtils.createSOAPMessage() issue, where
-		// a response
-		// of content type "text/xml" is thought to be REST if
-		// !MC.isServerSide(). This
-		// question is still under debate and due to the timelines, I am
-		// commiting this
-		// workaround as Axis2 1.2 is about to be released and  1.0
-		responseMsgCtx.setServerSide(false);
-
-		String contentType = AMQPUtils.getProperty(message, BaseConstants.CONTENT_TYPE);
+		String contentType = contentTypeProperty == null ? null : AMQPUtils.getProperty(message, contentTypeProperty);
 
 		AMQPUtils.setSOAPEnvelope(message, responseMsgCtx, contentType);
-		responseMsgCtx.setServerSide(true);
-
-		handleIncomingMessage(responseMsgCtx, map, (String) map.get(BaseConstants.SOAPACTION), contentType);
+		handleIncomingMessage(responseMsgCtx, AMQPUtils.getTransportHeaders(message), AMQPUtils.getProperty(message, BaseConstants.SOAPACTION), contentType);
 	}
 
+	private void setProperty(AMQPMessage message, MessageContext msgCtx, String key) {
+		AMQP.BasicProperties msg_props=null;
+		Map<String, Object> headers = null;
+		String value = getProperty(msgCtx, key);
+		
+		msg_props=message.getProperties();		 
+		headers=msg_props.getHeaders();
+		if (value != null) {
+			headers.put(key, value);
+			msg_props=msg_props.builder().headers(headers).build();
+		}
+	}
+
+	private String getProperty(MessageContext mc, String key) {
+		return (String) mc.getProperty(key);
+	}
 }

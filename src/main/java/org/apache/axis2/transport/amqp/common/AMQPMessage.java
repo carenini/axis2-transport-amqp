@@ -1,8 +1,8 @@
 package org.apache.axis2.transport.amqp.common;
 
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.AMQP.BasicProperties;
-
 public class AMQPMessage {
 	private String consumerTag=null;
 	private Envelope envelope=null;
@@ -17,6 +17,11 @@ public class AMQPMessage {
 		this.body = body;
 	}
 	
+	public AMQPMessage() {
+		AMQP.BasicProperties.Builder bob = new AMQP.BasicProperties.Builder();
+		properties = bob.build();
+	}
+
 	public String getConsumerTag() {
 		return consumerTag;
 	}

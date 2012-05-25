@@ -100,42 +100,6 @@ public class Destination {
         return props;
      }
 
-     /**
-      * Get the EPR for the given AMQP details
-      * the form of the URL is
-      * uri="amqp:/direct?routingKey=SimpleStockQuoteService&amp;connectionURL=qpid:virtualhost=test;client_id=foo@tcp:myhost.com:5672"
-      *
-      * Creates the EPR with the primary binding
-      *
-      */
-     public static String getEPR(List<Destination> list, String url) {
-
-         String epr = null;
-         for (Destination binding:list){
-
-             if (binding.isPrimary()){
-                 StringBuffer sb = new StringBuffer();
-                 sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(binding.getExchangeType());
-                 sb.append("/").append(binding.getExchangeName());
-                 sb.append("?").append(AMQPConstants.BINDING_ROUTING_KEY_ATTR).append("=").append(binding.getRoutingKey());
-                 sb.append("&amp;").append("connectionURL=").append(url);
-                 epr = sb.toString();
-             }
-         }
-
-         // If no primary is defined just get the first
-         if(epr == null){
-             Destination binding = list.get(0);
-             StringBuffer sb = new StringBuffer();
-             sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(binding.getExchangeType());
-             sb.append("/").append(binding.getExchangeName());
-             sb.append("?").append(AMQPConstants.BINDING_ROUTING_KEY_ATTR).append("=").append(binding.getRoutingKey());
-             sb.append("&amp;").append("connectionURL=").append(url);
-             epr = sb.toString();
-         }
-
-         return epr;
-     }
 
 	public boolean isPrimary() {
 		return primary;

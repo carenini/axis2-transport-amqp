@@ -28,8 +28,6 @@ import org.apache.axiom.om.OMElement;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
-import java.util.Hashtable;
-
 /**
  * Encapsulate an AMQP Connection factory definition within an Axis2.xml
  *
@@ -106,6 +104,21 @@ public class AMQPConnectionFactory {
     public Connection getConnection() throws IOException {
     	return confac.newConnection();
     }
+
+	public Destination getDestination(String replyDestName, String replyDestType) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public String getReplyToDestination() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public String getReplyDestinationType() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 	
 }

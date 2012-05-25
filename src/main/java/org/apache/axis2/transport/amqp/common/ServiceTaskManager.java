@@ -46,6 +46,7 @@ public class ServiceTaskManager {
     private Connection sharedConnection = null;
 	private Destination dest=null;
 	private Set<String> consumers=null;
+	private int concurrentConsumers;
 	
 	public ServiceTaskManager() {
 		consumers=new HashSet<String>();
