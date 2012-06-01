@@ -41,32 +41,16 @@ public class AMQPConstants {
     /**
      * Value indicating a Topic used for {@link DEST_PARAM_TYPE}, {@link REPLY_PARAM_TYPE}
      */
-    public static final String DESTINATION_TYPE_EXCHANGE = "exchange";
+    public static final String DESTINATION_TYPE_FANOUT_EXCHANGE = "fanout";
+    public static final String DESTINATION_TYPE_TOPIC_EXCHANGE = "topic";
+    public static final String DESTINATION_TYPE_DIRECT_EXCHANGE = "direct";
 
-    /**
-     * Value indicating a JMS 1.1 Generic Destination used by {@link DEST_PARAM_TYPE}, {@link REPLY_PARAM_TYPE}
-     */
-    public static final String DESTINATION_TYPE_GENERIC = "generic";
-
-    /** Do not cache any JMS resources between tasks (when sending) or JMS CF's (when sending) */
-	public static final int CACHE_NONE = 0;
-	/** Cache only the JMS connection between tasks (when receiving), or JMS CF's (when sending)*/
-	public static final int CACHE_CONNECTION = 1;
-	/** Cache only the JMS connection and Session between tasks (receiving), or JMS CF's (sending) */
-	public static final int CACHE_SESSION = 2;
-	/** Cache the JMS connection, Session and Consumer between tasks when receiving*/
-	public static final int CACHE_CONSUMER = 3;
-	/** Cache the JMS connection, Session and Producer within a JMSConnectionFactory when sending */
-	public static final int CACHE_PRODUCER = 4;
-    /** automatic choice of an appropriate caching level (depending on the transaction strategy) */
-	public static final int CACHE_AUTO = 5;
-
-    /** A JMS 1.1 Generic Destination type or ConnectionFactory */
-    public static final int GENERIC = 0;
     /** A Queue Destination type or ConnectionFactory */
     public static final int QUEUE = 1;
     /** A Topic Destination type or ConnectionFactory */
-    public static final int EXCHANGE = 2;
+    public static final int TOPIC_EXCHANGE = 2;
+    public static final int FANOUT_EXCHANGE = 3;
+    public static final int DIRECT_EXCHANGE = 4;
 
     /**
      * The EPR parameter name indicating the name of the message level property that indicated the content type.
@@ -214,25 +198,7 @@ public class AMQPConstants {
      * A MessageContext property or client Option indicating the JMS correlation id
      */
     public static final String AMQP_CORRELATION_ID = "AMQP_CORRELATION_ID";
-     /**
-     * A MessageContext property or client Option indicating the JMS delivery mode as an Integer or String
-     * Value 1 - javax.amqp.DeliveryMode.NON_PERSISTENT
-     * Value 2 - javax.amqp.DeliveryMode.PERSISTENT
-     */
-    public static final String JMS_DELIVERY_MODE = "JMS_DELIVERY_MODE";
-    /**
-     * A MessageContext property or client Option indicating the JMS destination to use on a Send
-     */
-    public static final String JMS_DESTINATION = "JMS_DESTINATION";
-    /**
-     * A MessageContext property or client Option indicating the JMS message expiration - a Long value
-     * specified as a String
-     */
-    public static final String JMS_EXPIRATION = "JMS_EXPIRATION";
-    /**
-     * A MessageContext property indicating if the message is a redelivery (Boolean as a String)
-     */
-    public static final String JMS_REDELIVERED = "JMS_REDELIVERED";
+    
     /**
      * A MessageContext property or client Option indicating the JMS replyTo Destination
      */
@@ -243,22 +209,10 @@ public class AMQPConstants {
      */
     public static final String AMQP_REPLY_TO_TYPE = "AMQP_REPLY_TO_TYPE";
     /**
-     * A MessageContext property or client Option indicating the JMS timestamp (Long specified as String)
-     */
-    public static final String JMS_TIMESTAMP = "JMS_TIMESTAMP";
-    /**
      * A MessageContext property indicating the JMS type String returned by {@link javax.amqp.Message.getJMSType()}
      */
     public static final String AMQP_TYPE = "AMQP_TYPE";
-    /**
-     * A MessageContext property or client Option indicating the JMS priority
-     */
-    public static final String JMS_PRIORITY = "JMS_PRIORITY";
-    /**
-     * A MessageContext property or client Option indicating the JMS time to live for message sent
-     */
-    public static final String JMS_TIME_TO_LIVE = "JMS_TIME_TO_LIVE";
-
+ 
     /** The prefix that denotes JMSX properties */
     public static final String JMSX_PREFIX = "JMSX";
     /** The JMSXGroupID property */

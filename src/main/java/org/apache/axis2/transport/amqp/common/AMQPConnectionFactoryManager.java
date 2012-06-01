@@ -89,9 +89,6 @@ public class AMQPConnectionFactoryManager {
             if (equals(props.get(AMQPConstants.PARAM_AMQP_CONFAC),
                 cfProperties.get(AMQPConstants.PARAM_AMQP_CONFAC))
                 &&
-                equals(props.get(Context.INITIAL_CONTEXT_FACTORY),
-                    cfProperties.get(Context.INITIAL_CONTEXT_FACTORY))
-                &&
                 equals(props.get(Context.PROVIDER_URL),
                     cfProperties.get(Context.PROVIDER_URL))
                 &&

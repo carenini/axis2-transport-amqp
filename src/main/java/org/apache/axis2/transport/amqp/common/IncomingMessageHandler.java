@@ -25,7 +25,7 @@ public class IncomingMessageHandler implements Runnable {
     private AMQPMessage message=null;
     
 	public IncomingMessageHandler(AMQPEndpoint ep, AMQPMessage msg)  {
-		this.body = body;
+		this.body = msg.getBody();
 		this.consumerTag=msg.getConsumerTag();
 		this.envelope=msg.getEnvelope();
 		this.endpoint=ep;
@@ -75,34 +75,18 @@ public class IncomingMessageHandler implements Runnable {
 				if (replyDestinationAddress != null) {
 					reply_to = replyDestinationAddress;
 				}
-
 			}
+			
 			if (reply_to != null) {
-				msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(cf, new Destination(reply_to), contentTypeInfo));
+				msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(cf, DestinationFactory.queueDestination(reply_to), contentTypeInfo));
 			}
 
 			AMQPUtils.setSOAPEnvelope(message, msgContext, contentTypeInfo);
-			// FIXME add transactions!
-			/*
-        if (ut != null) {
-            msgContext.setProperty(BaseConstants.USER_TRANSACTION, ut);
-        }
-			 */
-
+			
 			listener.handleIncomingMessage(msgContext, AMQPUtils.getTransportHeaders(message), soapAction, contentTypeInfo);
 
 		} catch (AxisFault e) {
 			e.printStackTrace();
-		} /* FIXME add transactions!
-		finally {
-
-			Object o = msgContext.getProperty(BaseConstants.SET_ROLLBACK_ONLY);
-			if (o != null) {
-				if ((o instanceof Boolean && ((Boolean) o)) ||
-						(o instanceof String && Boolean.valueOf((String) o))) {
-					throw new RollbackRequestException();
-				}
-			}
-		}*/
+		} 
 	}
 }

@@ -44,6 +44,8 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 * level
 	 */
 	private ConnectionFactory connectionFactory = null;
+	
+	private AMQPConnectionFactoryManager conn_manager=null;
 	/**
 	 * this is a reference to a AMQP Connection Factory instance, which has a
 	 * reference to the underlying actual connection factory, an open connection
@@ -69,12 +71,6 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 */
 	private String contentType;
 
-	private String replyDestinationName;
-
-	private String replyDestinationType;
-
-	private String destinationType;
-
 	/**
 	 * Creates an instance using the given AMQP connection factory and
 	 * destination
@@ -99,28 +95,32 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 *            the target EPR
 	 */
 	public AMQPTransportInfo(String targetEPR) {
-
+		String replyDestinationName=null;
+		String destinationName=null;
+		int replyDestinationType = -1;
+		int destinationType = -1;
+		
 		this.targetEPR = targetEPR;
 		if (!targetEPR.startsWith(AMQPConstants.AMQP_PREFIX)) {
 			handleException("Invalid prefix for a AMQP EPR : " + targetEPR);
-
 		} else {
 			properties = BaseUtils.getEPRProperties(targetEPR);
-			String destinationType = properties.get(AMQPConstants.PARAM_DEST_TYPE);
-			if (destinationType != null) {
-				setDestinationType(destinationType);
-			}
-
-			String replyDestinationType = properties.get(AMQPConstants.PARAM_REPLY_DEST_TYPE);
-			if (replyDestinationType != null) {
-				setReplyDestinationType(replyDestinationType);
-			}
-
+			destinationName = properties.get(AMQPConstants.PARAM_REPLY_DESTINATION);
+			destinationType = Integer.parseInt(properties.get(AMQPConstants.PARAM_DEST_TYPE));
+			
+			replyDestinationType=Integer.parseInt(properties.get(AMQPConstants.PARAM_REPLY_DEST_TYPE));
 			replyDestinationName = properties.get(AMQPConstants.PARAM_REPLY_DESTINATION);
+		
 			contentType = properties.get(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
 
-			destination = getDestination(targetEPR);
 			replyDestination = getReplyDestination(targetEPR);
+			
+			// FIXME extract routing keys
+			if(destinationType==AMQPConstants.QUEUE) destination=DestinationFactory.queueDestination(destinationName);
+			else destination=DestinationFactory.exchangeDestination(destinationName, destinationType, null);
+			
+			if(replyDestinationType==AMQPConstants.QUEUE) replyDestination=DestinationFactory.queueDestination(replyDestinationName);
+			else replyDestination=DestinationFactory.exchangeDestination(replyDestinationName, replyDestinationType, null);
 		}
 	}
 
@@ -128,12 +128,12 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 * Provides a lazy load when created with a target EPR. This method performs
 	 * actual lookup for the connection factory and destination
 	 */
-	public void loadConnectionFactoryFromProperies() {
+/*	public void loadConnectionFactoryFromProperies() {
 		if (properties != null) {
 			connectionFactory = getConnectionFactory(properties);
 		}
 	}
-
+*/
 	/**
 	 * Get the referenced ConnectionFactory using the properties from the
 	 * context
@@ -144,7 +144,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 *            the properties which contains the JNDI name of the factory
 	 * @return the connection factory
 	 */
-	private ConnectionFactory getConnectionFactory(Hashtable<String, String> props) {
+/*	private ConnectionFactory getConnectionFactory(Hashtable<String, String> props) {
 		String conFacId = props.get(AMQPConstants.PARAM_CONFAC_ID);
 		if (conFacId != null) {
 			return AMQPUtils.lookup(ConnectionFactory.class, conFacId);
@@ -153,7 +153,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		}
 		return null;
 	}
-
+*/
 	/**
 	 * Get the AMQP destination specified by the given URL from the context
 	 * 
@@ -163,12 +163,12 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 *            URL
 	 * @return the AMQP destination, or null if it does not exist
 	 */
-	private Destination getDestination(String url) {
+/*	private Destination getDestination(String url) {
 		Destination d = AMQPUtils.getDestination(url);
 		log.debug("Lookup the AMQP destination " + d.getName() + " of type " + d.getType() + " extracted from the URL " + url);
 		return d;
 	}
-
+*/
 	private void handleException(String s) {
 		log.error(s);
 		throw new AxisAMQPException(s);
@@ -204,38 +204,12 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		return targetEPR;
 	}
 
-	public String getDestinationType() {
-		return destinationType;
-	}
-
-	public void setDestinationType(String destinationType) {
-		if (destinationType != null) {
-			this.destinationType = destinationType;
-		}
-	}
-
 	public Destination getReplyDestination() {
 		return replyDestination;
 	}
 
 	public void setReplyDestination(Destination replyDestination) {
 		this.replyDestination = replyDestination;
-	}
-
-	public String getReplyDestinationType() {
-		return replyDestinationType;
-	}
-
-	public void setReplyDestinationType(String replyDestinationType) {
-		this.replyDestinationType = replyDestinationType;
-	}
-
-	public String getReplyDestinationName() {
-		return replyDestinationName;
-	}
-
-	public void setReplyDestinationName(String replyDestinationName) {
-		this.replyDestinationName = replyDestinationName;
 	}
 
 	public String getContentTypeProperty() {
@@ -256,37 +230,24 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	public AMQPMessageSender createAMQPSender() throws IOException {
 		Channel chan = null;
 		Connection connection = null;
+		int dest_type=-1;
 		
-		// digest the targetAddress and locate CF from the EPR
-		loadConnectionFactoryFromProperies();
-
 		// create a one time connection and session to be used
 		String user = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_USERNAME) : null;
 		String pass = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_PASSWORD) : null;
-
-		int destType = -1;
-		if (AMQPConstants.DESTINATION_TYPE_QUEUE.equals(destinationType)) {
-			destType = AMQPConstants.QUEUE;
-		} else if (AMQPConstants.DESTINATION_TYPE_EXCHANGE.equals(destinationType)) {
-			destType = AMQPConstants.EXCHANGE;
-		}
 
 		if (connection == null) {
 			connection = amqpConnectionFactory != null ? amqpConnectionFactory.getConnection() : null;
 		}
 
+		dest_type=destination.getType();
 		chan=connection.createChannel();
 		if (connection != null) {
-			if (destType == AMQPConstants.QUEUE) {
-				chan.queueDeclare(destination.getName(), false, false, true, null);
-			} else {
-				//TODO exchange type!
-				chan.exchangeDeclare(destination.getName(), "direct", true);
-			}
+			if (dest_type == AMQPConstants.QUEUE) chan.queueDeclare(destination.getName(), false, false, true, null);
+			// TODO Exchange type
+			else chan.exchangeDeclare(destination.getName(), "direct", true);
 		}
-
 		return new AMQPMessageSender(chan, destination);
-
 	}
 
 	public Object getConnectionURL() {
@@ -297,5 +258,13 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	public Destination getReplyDestination(String replyDestName) {
 		// TODO Auto-generated method stub
 		return null;
+	}
+
+	public AMQPConnectionFactoryManager getConnectionManager() {
+		return conn_manager;
+	}
+
+	public void setConnectionManager(AMQPConnectionFactoryManager conn_manager) {
+		this.conn_manager = conn_manager;
 	}
 }

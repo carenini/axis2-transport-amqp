@@ -20,7 +20,6 @@ import org.apache.axis2.description.AxisService;
 import org.apache.axis2.description.Parameter;
 import org.apache.axis2.description.ParameterInclude;
 import org.apache.axis2.transport.amqp.in.AMQPListener;
-import org.apache.axis2.transport.base.ParamUtils;
 import org.apache.axis2.transport.base.ProtocolEndpoint;
 import org.apache.axis2.transport.base.threads.WorkerPool;
 import org.apache.axis2.addressing.EndpointReference;
@@ -46,36 +45,16 @@ public class AMQPEndpoint extends ProtocolEndpoint {
     private final WorkerPool workerPool;
     
     private AMQPConnectionFactory cf;
-    private String destinationName;
-    private int destinationType = AMQPConstants.QUEUE;
-    private String replyDestinationName;
-    private String replyDestinationType = AMQPConstants.DESTINATION_TYPE_QUEUE;
+    
+    private Destination sink=null;
+    private Destination source=null;
+    
     private Set<EndpointReference> endpointReferences = new HashSet<EndpointReference>();
     private ServiceTaskManager serviceTaskManager;
 
     public AMQPEndpoint(AMQPListener listener, WorkerPool workerPool) {
         this.amqp_listener = listener;
         this.workerPool = workerPool;
-    }
-
-    public String getDestinationName() {
-        return destinationName;
-    }
-
-    private void setDestinationType(String destinationType) {
-      
-    }
-
-    private void setReplyDestinationType(String destinationType) {
-      
-    }
-
-    public String getReplyDestinationName() {
-        return replyDestinationName;
-    }
-
-    public String getReplyDestinationType() {
-        return replyDestinationType;
     }
 
     @Override
@@ -113,22 +92,10 @@ public class AMQPEndpoint extends ProtocolEndpoint {
     private String getEPR() {
         StringBuffer sb = new StringBuffer();
 
-        sb.append(AMQPConstants.AMQP_PREFIX).append(destinationName);
-        sb.append("?").append(AMQPConstants.PARAM_DEST_TYPE).append("=").append(
-            destinationType == AMQPConstants.EXCHANGE ?
-                AMQPConstants.DESTINATION_TYPE_EXCHANGE : AMQPConstants.DESTINATION_TYPE_QUEUE);
-//FIXME
-        /*if (contentTypeRuleSet != null) {
-            String contentTypeProperty = contentTypeRuleSet.getDefaultContentTypeProperty();
-            if (contentTypeProperty != null) {
-                sb.append("&");
-                sb.append(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
-                sb.append("=");
-                sb.append(contentTypeProperty);
-            }
-        }*/
-
-		for (Map.Entry<String, String> entry : cf.getParameters().entrySet()) {
+        sb.append(AMQPConstants.AMQP_PREFIX).append(sink.getName());
+        sb.append("?").append(AMQPConstants.PARAM_DEST_TYPE).append("=").append(Destination.destination_type_to_param(source.getType()));
+            
+       	for (Map.Entry<String, String> entry : cf.getParameters().entrySet()) {
 			sb.append("&").append(entry.getKey()).append("=").append(entry.getValue());
         }
         return sb.toString();
@@ -148,65 +115,68 @@ public class AMQPEndpoint extends ProtocolEndpoint {
 
     @Override
     public boolean loadConfiguration(ParameterInclude params) throws AxisFault {
-        // We only support endpoints configured at service level
-        if (!(params instanceof AxisService)) {
-            return false;
-        }
+    	AxisService service = null;
+    	Parameter destParam = null;
+    	Parameter replyParam = null;
+    	Parameter destTypeParam = null;
+    	Parameter replyDestTypeParam = null;
+    	String sourceName=null;
+        int sourceType=0;
+        String sinkName=null;
+        int sinkType=0;
         
-        AxisService service = (AxisService)params;
-        
+    	// We only support endpoints configured at service level
+        if (!(params instanceof AxisService)) return false;
+               
+        service=(AxisService)params;
         cf = amqp_listener.getConnectionFactory(service);
-        if (cf == null) {
-            return false;
-        }
-
-        Parameter destParam = service.getParameter(AMQPConstants.PARAM_DESTINATION);
-        if (destParam != null) {
-            destinationName = (String)destParam.getValue();
-        } else {
-            // Assume that the JNDI destination name is the same as the service name
-            destinationName = service.getName();
-        }
+        if (cf == null) return false;
         
-        Parameter destTypeParam = service.getParameter(AMQPConstants.PARAM_DEST_TYPE);
+        destParam=service.getParameter(AMQPConstants.PARAM_DESTINATION);
+        
+        /* SINK = DESTINATION */
+		if (destParam != null) sinkName = (String)destParam.getValue();
+        else sinkName = service.getName();
+        
+        destTypeParam=service.getParameter(AMQPConstants.PARAM_DEST_TYPE);
         if (destTypeParam != null) {
             String paramValue = (String) destTypeParam.getValue();
-            if (AMQPConstants.DESTINATION_TYPE_QUEUE.equals(paramValue) ||
-                    AMQPConstants.DESTINATION_TYPE_EXCHANGE.equals(paramValue) )  {
-                setDestinationType(paramValue);
-            } else {
-                throw new AxisFault("Invalid destinaton type value " + paramValue);
-            }
+            sinkType=Destination.param_to_destination_type(paramValue);
         } else {
             log.debug("AMQP destination type not given. default queue");
-            destinationType = AMQPConstants.QUEUE;
+            sinkType = AMQPConstants.QUEUE;
         }
 
-        Parameter replyDestTypeParam = service.getParameter(AMQPConstants.PARAM_REPLY_DEST_TYPE);
+        /* SOURCE = REPLY_TO */
+        replyParam=service.getParameter(AMQPConstants.PARAM_REPLY_DESTINATION);
+        
+		if (replyParam != null) sourceName = (String)replyParam.getValue();
+        else sourceName = service.getName();
+         
+        replyDestTypeParam=service.getParameter(AMQPConstants.PARAM_REPLY_DEST_TYPE);
         if (replyDestTypeParam != null) {
             String paramValue = (String) replyDestTypeParam.getValue();
-            if (AMQPConstants.DESTINATION_TYPE_QUEUE.equals(paramValue) ||
-                    AMQPConstants.DESTINATION_TYPE_EXCHANGE.equals(paramValue) )  {
-                setReplyDestinationType(paramValue);
-            } else {
-                throw new AxisFault("Invalid destinaton type value " + paramValue);
-            }
+            sourceType=Destination.param_to_destination_type(paramValue);
         } else {
             log.debug("AMQP reply destination type not given. default queue");
-            destinationType = AMQPConstants.QUEUE;
+            sourceType = AMQPConstants.QUEUE;
         }
         
-        replyDestinationName = ParamUtils.getOptionalParam(service,AMQPConstants.PARAM_REPLY_DESTINATION);
-        
-        computeEPRs(); // compute service EPR and keep for later use        
+        // compute service EPR and keep for later use
+        computeEPRs();         
         
         serviceTaskManager = ServiceTaskManagerFactory.createTaskManagerForService(cf, service, workerPool);
-        serviceTaskManager.setMessageReceiver(new AMQPMessageReceiver(amqp_listener, cf, this));
+
+        if (sourceType==AMQPConstants.QUEUE) source=DestinationFactory.queueDestination(sourceName);
+        else source=DestinationFactory.exchangeDestination(sourceName, sourceType, null);
+        
+        if (sinkType==AMQPConstants.QUEUE) sink=DestinationFactory.queueDestination(sinkName);
+        else sink=DestinationFactory.exchangeDestination(sinkName, sinkType, null);
         
         return true;
     }
 
-	public String getReplyDestinationAddress() {
+ 	public String getReplyDestinationAddress() {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -217,6 +187,22 @@ public class AMQPEndpoint extends ProtocolEndpoint {
 
 	public void setAmqpListener(AMQPListener amqp_listener) {
 		this.amqp_listener = amqp_listener;
+	}
+
+	public Destination getSink() {
+		return sink;
+	}
+
+	public void setSink(Destination sink) {
+		this.sink = sink;
+	}
+
+	public Destination getSource() {
+		return source;
+	}
+
+	public void setSource(Destination source) {
+		this.source = source;
 	}
 
 }

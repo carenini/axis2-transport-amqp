@@ -2,6 +2,11 @@ package org.apache.axis2.transport.amqp.common;
 
 public class RollbackRequestException extends Exception {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 2568924002406133165L;
+
 	public RollbackRequestException() {
 		// TODO Auto-generated constructor stub
 	}

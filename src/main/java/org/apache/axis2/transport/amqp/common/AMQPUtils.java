@@ -40,7 +40,6 @@ import javax.mail.internet.ContentType;
 import javax.mail.internet.ParseException;
 
 import java.io.ByteArrayInputStream;
-import java.lang.reflect.Method;
 import java.util.*;
 
 /**
@@ -345,8 +344,8 @@ public class AMQPUtils extends BaseUtils {
 
             if (binding.isPrimary()){
                 StringBuffer sb = new StringBuffer();
-                sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(binding.getExchangeType());
-                sb.append("/").append(binding.getExchangeName());
+                sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(Destination.destination_type_to_param(binding.getType()));
+                sb.append("/").append(binding.getName());
                 sb.append("?").append(AMQPConstants.BINDING_ROUTING_KEY_ATTR).append("=").append(binding.getRoutingKey());
                 sb.append("&amp;").append("connectionURL=").append(url);
                 epr = sb.toString();
@@ -357,8 +356,8 @@ public class AMQPUtils extends BaseUtils {
         if(epr == null){
             Destination binding = list.get(0);
             StringBuffer sb = new StringBuffer();
-            sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(binding.getExchangeType());
-            sb.append("/").append(binding.getExchangeName());
+            sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(Destination.destination_type_to_param(binding.getType()));
+            sb.append("/").append(binding.getName());
             sb.append("?").append(AMQPConstants.BINDING_ROUTING_KEY_ATTR).append("=").append(binding.getRoutingKey());
             sb.append("&amp;").append("connectionURL=").append(url);
             epr = sb.toString();
@@ -378,8 +377,12 @@ public class AMQPUtils extends BaseUtils {
 	public static String getDestinationTypeAsString(int destType) {
 		if (destType == AMQPConstants.QUEUE) {
 			return "Queue";
-		} else if (destType == AMQPConstants.EXCHANGE) {
-			return "Exchange";
+		} else if (destType == AMQPConstants.DIRECT_EXCHANGE) {
+			return "Direct Exchange";
+		} else if (destType == AMQPConstants.FANOUT_EXCHANGE) {
+			return "Fanout Exchange";
+		} else if (destType == AMQPConstants.TOPIC_EXCHANGE) {
+			return "Topic Exchange";
 		} else {
 			return "Generic";
 		}

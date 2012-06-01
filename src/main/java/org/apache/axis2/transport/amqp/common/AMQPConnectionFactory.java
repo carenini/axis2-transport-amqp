@@ -105,20 +105,5 @@ public class AMQPConnectionFactory {
     	return confac.newConnection();
     }
 
-	public Destination getDestination(String replyDestName, String replyDestType) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public String getReplyToDestination() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public String getReplyDestinationType() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
 	
 }

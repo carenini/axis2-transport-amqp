@@ -1,10 +1,9 @@
 package org.apache.axis2.transport.amqp.common;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import com.rabbitmq.client.Connection;
+import org.apache.axis2.AxisFault;
 
 
 /** sample uri formats - this is temporary until the AMQP WG defines a proper addressing scheme
@@ -15,48 +14,14 @@ import com.rabbitmq.client.Connection;
 public class Destination {
 
 	private String name=null;
-    private String exchangeName = "amq.direct";
-    private String exchangeType = "direct";
     private String routingKey;
-    private String queue=null;
     private int type=AMQPConstants.QUEUE;
     private boolean primary=false;
     
     public Destination(){
     }
 
-    public Destination(String queue_name) {
-    	this.queue=queue_name;
-    	name=queue;
-    	type=AMQPConstants.QUEUE;
-    }
-    public Destination(String exchangeName, String exchangeType, String routingKey, boolean primary)
-    {
-        super();
-        this.exchangeName = exchangeName;
-        this.exchangeType = exchangeType;
-        this.routingKey = routingKey;
-        this.setPrimary(primary);
-        name=exchangeName;
-        this.type=AMQPConstants.EXCHANGE;
-    }
-
-    public String getExchangeName()
-    {
-        return exchangeName;
-    }
-    public void setExchangeName(String exchangeName)
-    {
-        this.exchangeName = exchangeName;
-    }
-    public String getExchangeType()
-    {
-        return exchangeType;
-    }
-    public void setExchangeType(String exchangeType)
-    {
-        this.exchangeType = exchangeType;
-    }
+    
     public String getRoutingKey()
     {
         return routingKey;
@@ -74,8 +39,8 @@ public class Destination {
 		this.type = type;
 	}
 	
-    public static Map parse(String uri){
-        Map props = new HashMap();
+    public static Map<String, String>  parse(String uri){
+        Map<String, String> props = new HashMap<String, String>();
         String temp = uri.substring(6,uri.indexOf("?"));
         String exchangeType =  temp.substring(0,temp.indexOf("/"));
         String exchangeName =  temp.substring(temp.indexOf("/"),temp.length());
@@ -113,5 +78,32 @@ public class Destination {
 		return name;
 	}
 
+	public void setName(String name) {
+		this.name = name;
+	}
 
+	public String toAddress(){
+		return null;
+		
+	}
+	
+	public static int param_to_destination_type(String value) throws AxisFault{
+		if (AMQPConstants.DESTINATION_TYPE_QUEUE.equals(value)) return AMQPConstants.QUEUE;
+		else if (AMQPConstants.DESTINATION_TYPE_DIRECT_EXCHANGE.equals(value)) return AMQPConstants.DIRECT_EXCHANGE;
+		else if (AMQPConstants.DESTINATION_TYPE_TOPIC_EXCHANGE.equals(value)) return AMQPConstants.TOPIC_EXCHANGE;
+		else if (AMQPConstants.DESTINATION_TYPE_FANOUT_EXCHANGE.equals(value)) return AMQPConstants.FANOUT_EXCHANGE;
+		else throw new AxisFault("Invalid destinaton type value " + value);
+	}
+
+	public static String destination_type_to_param(int value) {
+		if (AMQPConstants.QUEUE==value) 
+			return AMQPConstants.DESTINATION_TYPE_QUEUE;
+		else if (AMQPConstants.DIRECT_EXCHANGE==value) 
+			return AMQPConstants.DESTINATION_TYPE_DIRECT_EXCHANGE;
+		else if (AMQPConstants.TOPIC_EXCHANGE==value) 
+			return AMQPConstants.DESTINATION_TYPE_TOPIC_EXCHANGE;
+		else if (AMQPConstants.FANOUT_EXCHANGE==value) 
+			return AMQPConstants.DESTINATION_TYPE_FANOUT_EXCHANGE;
+		return null;
+	}
 }

@@ -35,7 +35,7 @@ import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
 
 /**
- * Performs the actual sending of a JMS message, and the subsequent committing of a JTA transaction
+ * Performs the actual sending of a AMQP message, and the subsequent committing of a JTA transaction
  * (if requested) or the local session transaction, if used. An instance of this class is unique
  * to a single message send out operation and will not be shared.
  */
@@ -48,24 +48,19 @@ public class AMQPMessageSender {
 
 
     /**
-     * This is a low-end method to support the one-time sends using JMS 1.0.2b
-     * @param connection the JMS Connection
-     * @param session JMS Channel
-     * @param producer the MessageProducer
-     * @param destination the JMS Destination
-     * @param cacheLevel cacheLevel - None | Connection | Channel | Producer
-     * @param jmsSpec11 true if the JMS 1.1 API should be used
-     * @param isQueue posting to a Queue?
+     * This is a low-end method to support the one-time sends using AMQP
+     * @param chan AMQP Channel
+     * @param destination the AMQP Destination
      */
-    public AMQPMessageSender(Channel session, Destination destination) {
-        this.chan = session;
+    public AMQPMessageSender(Channel chan, Destination destination) {
+        this.chan = chan;
         this.destination = destination;
     }
 
     /**
-     * Perform actual send of JMS message to the Destination selected
+     * Perform actual send of AMQP message to the Destination selected
      *
-     * @param message the JMS message
+     * @param message the AMQP message
      * @param msgCtx the Axis2 MessageContext
      * @throws IOException 
      */
@@ -95,7 +90,6 @@ public class AMQPMessageSender {
     		msg_prop=msg_prop.builder().expiration(timeToLive.toString()).build();
     	}
 
-    	boolean sendingSuccessful = false;
     	// perform actual message sending
 
     	if (destination.getType()==AMQPConstants.QUEUE){
@@ -117,38 +111,6 @@ public class AMQPMessageSender {
     		log.debug("Sent Message Context ID : " + msgCtx.getMessageID() +" with Message ID : " + msgId +" to destination : " + destination);
     	}
 
-  /*  	if (jtaCommit != null) {
-    		UserTransaction ut = (UserTransaction) msgCtx.getProperty(BaseConstants.USER_TRANSACTION);
-    		if (ut != null) {
-    			try {
-    				if (sendingSuccessful && jtaCommit) {
-    					ut.commit();
-    				} else {
-    					ut.rollback();
-    				}
-    				msgCtx.removeProperty(BaseConstants.USER_TRANSACTION);
-
-    				if (log.isDebugEnabled()) {
-    					log.debug((sendingSuccessful ? "Committed" : "Rolled back") +" JTA Transaction");
-    				}
-
-    			} catch (Exception e) {
-    				handleException("Error committing/rolling back JTA transaction after " +"sending of message with MessageContext ID : " + msgCtx.getMessageID() + " to destination : " + destination, e);
-    			}
-    		}
-
-    	} else {
-    		if (chan.getTransacted()) {
-    			if (sendingSuccessful && (rollbackOnly == null || !rollbackOnly)) {
-    				chan.commit();
-    			} else {
-    				chan.rollback();
-    			}
-    		}
-    		if (log.isDebugEnabled()) {
-    			log.debug((sendingSuccessful ? "Committed" : "Rolled back") +" local (JMS Channel) Transaction");
-    		}
-    	}*/
     }
 
     /**
@@ -158,7 +120,6 @@ public class AMQPMessageSender {
     	try {
 			chan.close();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
     }
@@ -193,9 +154,22 @@ public class AMQPMessageSender {
     }
 
 	public Channel getChannel() {
-		// TODO Auto-generated method stub
 		return chan;
 	}
+
+	public void setChannel(Channel chan) {
+		this.chan = chan;
+	}
+
+	public Destination getDestination() {
+		return destination;
+	}
+
+	public void setDestination(Destination destination) {
+		this.destination = destination;
+	}
+
+
 
 
 }

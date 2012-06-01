@@ -21,7 +21,6 @@ import java.util.Map;
 
 import org.apache.axis2.description.AxisService;
 import org.apache.axis2.description.Parameter;
-import org.apache.axis2.transport.base.BaseConstants;
 import org.apache.axis2.transport.base.threads.WorkerPool;
 
 public class ServiceTaskManagerFactory {
@@ -48,10 +47,6 @@ public class ServiceTaskManagerFactory {
 
 		stm.setServiceName(name);
 
-/*		stm.setConnFactoryJNDIName(getRqdStringProperty(AMQPConstants.PARAM_CONFAC_JNDI_NAME, svc, cf));
-		stm.setDestinationJNDIName(destName);
-		stm.setDestinationType(getDestinationType(svc, cf));
-*/
 		//TODO create the Destination
 		
 		String destName = getOptionalStringProperty(AMQPConstants.PARAM_DESTINATION, svc, cf);
@@ -59,12 +54,7 @@ public class ServiceTaskManagerFactory {
 			destName = service.getName();
 		}
 
-		/* FIXME Transactions support
-		stm.setTransactionality(getTransactionality(svc, cf));
-		stm.setCacheUserTransaction(getOptionalBooleanProperty(BaseConstants.PARAM_CACHE_USER_TXN, svc, cf));
-		stm.setUserTransactionJNDIName(getOptionalStringProperty(BaseConstants.PARAM_USER_TXN_JNDI_NAME, svc, cf));
-		stm.setSessionTransacted(getOptionalBooleanProperty(AMQPConstants.PARAM_SESSION_TRANSACTED, svc, cf));
-		*/
+
 		
 		//stm.setMessageSelector(getOptionalStringProperty(AMQPConstants.PARAM_MSG_SELECTOR, svc, cf));
 
@@ -97,18 +87,6 @@ public class ServiceTaskManagerFactory {
 			}
 		}
 		return map;
-	}
-
-	private static String getRqdStringProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
-
-		String value = svcMap.get(key);
-		if (value == null) {
-			value = cfMap.get(key);
-		}
-		if (value == null) {
-			throw new AxisAMQPException("Service/connection factory property : " + key);
-		}
-		return value;
 	}
 
 	private static String getOptionalStringProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
@@ -163,64 +141,6 @@ public class ServiceTaskManagerFactory {
 			}
 		}
 		return null;
-	}
-
-	private static int getTransactionality(Map<String, String> svcMap, Map<String, String> cfMap) {
-
-		String key = BaseConstants.PARAM_TRANSACTIONALITY;
-		String val = svcMap.get(key);
-		if (val == null) {
-			val = cfMap.get(key);
-		}
-
-		if (val == null) {
-			return BaseConstants.TRANSACTION_NONE;
-
-		} else {
-			if (BaseConstants.STR_TRANSACTION_JTA.equalsIgnoreCase(val)) {
-				return BaseConstants.TRANSACTION_JTA;
-			} else if (BaseConstants.STR_TRANSACTION_LOCAL.equalsIgnoreCase(val)) {
-				return BaseConstants.TRANSACTION_LOCAL;
-			} else {
-				throw new AxisAMQPException("Invalid option : " + val + " for parameter : " + BaseConstants.STR_TRANSACTION_JTA);
-			}
-		}
-	}
-
-	private static int getDestinationType(Map<String, String> svcMap, Map<String, String> cfMap) {
-
-		String key = AMQPConstants.PARAM_DEST_TYPE;
-		String val = svcMap.get(key);
-		if (val == null) {
-			val = cfMap.get(key);
-		}
-
-		if (AMQPConstants.DESTINATION_TYPE_EXCHANGE.equalsIgnoreCase(val)) {
-			return AMQPConstants.EXCHANGE;
-		}
-		return AMQPConstants.QUEUE;
-	}
-
-	private static int getCacheLevel(Map<String, String> svcMap, Map<String, String> cfMap) {
-
-		String key = AMQPConstants.PARAM_CACHE_LEVEL;
-		String val = svcMap.get(key);
-		if (val == null) {
-			val = cfMap.get(key);
-		}
-
-		if ("none".equalsIgnoreCase(val)) {
-			return AMQPConstants.CACHE_NONE;
-		} else if ("connection".equalsIgnoreCase(val)) {
-			return AMQPConstants.CACHE_CONNECTION;
-		} else if ("session".equals(val)) {
-			return AMQPConstants.CACHE_SESSION;
-		} else if ("consumer".equals(val)) {
-			return AMQPConstants.CACHE_CONSUMER;
-		} else if (val != null) {
-			throw new AxisAMQPException("Invalid cache level : " + val);
-		}
-		return AMQPConstants.CACHE_AUTO;
 	}
 
 }

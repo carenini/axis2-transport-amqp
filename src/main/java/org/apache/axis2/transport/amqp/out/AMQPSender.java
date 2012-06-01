@@ -38,8 +38,10 @@ import org.apache.axis2.transport.amqp.common.AMQPMessage;
 import org.apache.axis2.transport.amqp.common.AMQPTransportInfo;
 import org.apache.axis2.transport.amqp.common.AMQPUtils;
 import org.apache.axis2.transport.amqp.common.Destination;
+import org.apache.axis2.transport.amqp.common.DestinationFactory;
 
 import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Envelope;
 
@@ -117,6 +119,8 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		AMQPConnectionFactory conFac = null;
 		AMQPTransportInfo amqpOut = null;
 		AMQPMessageSender messageSender = null;
+		Connection con=null;
+		Channel chan=null;
 
 		if (targetAddress != null) {
 			amqpOut = new AMQPTransportInfo(targetAddress);
@@ -124,17 +128,28 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 			// address?
 			conFac = getAMQPConnectionFactory(amqpOut);
 
-			if (conFac != null) {
-				messageSender = new AMQPMessageSender(conFac, targetAddress);
+			try {
+				if (conFac != null) {
 
-			} else {
+					con=conFac.getConnection();
+					chan=con.createChannel();
+					messageSender = new AMQPMessageSender(chan, DestinationFactory.parseAddress(targetAddress));
+
+				} else {
 					messageSender = amqpOut.createAMQPSender();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 
 		} else if (outTransportInfo != null && outTransportInfo instanceof AMQPTransportInfo) {
 
 			amqpOut = (AMQPTransportInfo) outTransportInfo;
-				messageSender = amqpOut.createAMQPSender();
+				try {
+					messageSender = amqpOut.createAMQPSender();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 		}
 
 		// The message property to be used to send the content type is
@@ -151,12 +166,13 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 			contentTypeProperty = amqpOut.getContentTypeProperty();
 		}
 
-		// need to synchronize as Sessions are not thread safe
-		synchronized (messageSender.getSession()) {
+		try {
+			sendOverAMQP(msgCtx, messageSender, contentTypeProperty, chan, amqpOut);
+		} finally {
 			try {
-				sendOverAMQP(msgCtx, messageSender, contentTypeProperty, jmsConnectionFactory, amqpOut);
-			} finally {
-				messageSender.close();
+				chan.close();
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 		}
 	}
@@ -164,7 +180,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	/**
 	 * Perform actual sending of the AMQP message
 	 */
-	private void sendOverAMQP(MessageContext msgCtx, AMQPMessageSender messageSender, String contentTypeProperty, AMQPConnectionFactory amqpConnectionFactory, AMQPTransportInfo amqpOut) throws AxisFault {
+	private void sendOverAMQP(MessageContext msgCtx, AMQPMessageSender messageSender, String contentTypeProperty, Channel chan, AMQPTransportInfo amqpOut) throws AxisFault {
 
 		// convert the axis message context into a AMQP Message that we can send
 		// over AMQP
@@ -172,6 +188,9 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		AMQP.BasicProperties msg_prop=null;
 		Envelope msg_env=null;
 		String correlationId = null;
+		String replyDestType = null;
+		String replyDestName = null; 
+
 		// should we wait for a synchronous response on this same thread?
 		boolean waitForResponse = waitForSynchronousResponse(msgCtx);
 
@@ -184,24 +203,17 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		// destination
 		if (waitForResponse) {
 
-			String replyDestName = (String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO);
-			if (replyDestName == null && amqpConnectionFactory != null) {
-				replyDestName = amqpConnectionFactory.getReplyToDestination();
+			replyDestName=(String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO);
+			if (replyDestName == null && amqpOut != null) {
+				replyDestName = amqpOut.getReplyDestination().getName();
 			}
 
-			String replyDestType = (String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO_TYPE);
-			if (replyDestType == null && amqpConnectionFactory != null) {
-				replyDestType = amqpConnectionFactory.getReplyDestinationType();
+			replyDestType=(String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO_TYPE);
+			if (replyDestType == null && amqpOut != null) {
+				replyDestType = Destination.destination_type_to_param(amqpOut.getReplyDestination().getType());
 			}
-
-			if (replyDestName != null) {
-				if (amqpConnectionFactory != null) {
-					replyDestination = amqpConnectionFactory.getDestination(replyDestName, replyDestType);
-				} else {
-					replyDestination = amqpOut.getReplyDestination(replyDestName);
-				}
-			}
-			replyDestination = AMQPUtils.setReplyDestination(replyDestination, messageSender.getSession(), message);
+			
+			replyDestination=DestinationFactory.exchangeDestination(replyDestName, Destination.param_to_destination_type(replyDestType), null);
 		}
 
 		messageSender.send(message, msgCtx);
@@ -223,7 +235,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 			// asynchronous worker thread
 			
 			messageSender.getConnection().start(); // multiple calls are safely ignored
-			correlationId = msg_prop.getMessageId();
+			correlationId = msg_prop.getCorrelationId();
 
 			// We assume here that the response uses the same message property to specify the content type of the message.
 			waitForResponseAndProcess(messageSender.getSession(), replyDestination, msgCtx, correlationId, contentTypeProperty);
@@ -252,7 +264,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	private void waitForResponseAndProcess(Channel chan, Destination replyDestination, MessageContext msgCtx, String correlationId, String contentTypeProperty) throws AxisFault {
 
 		//try {
-			MessageConsumer consumer;
+			Consumer consumer;
 			consumer = AMQPUtils.createConsumer(chan, replyDestination, "AMQPCorrelationID = '" + correlationId + "'");
 
 			// how long are we willing to wait for the sync response
@@ -324,6 +336,7 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		String msgType = getProperty(msgContext, AMQPConstants.AMQP_MESSAGE_TYPE);
 		
 		message=new AMQPMessage();
+		msg_prop=message.getProperties();
 		// check the first element of the SOAP body, do we have content wrapped
 		// using the
 		// default wrapper elements for binary
