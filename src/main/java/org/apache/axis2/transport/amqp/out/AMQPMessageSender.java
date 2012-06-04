@@ -45,8 +45,6 @@ public class AMQPMessageSender {
 	private Channel chan;
 	private Destination destination;
 
-
-
     /**
      * This is a low-end method to support the one-time sends using AMQP
      * @param chan AMQP Channel
@@ -106,11 +104,7 @@ public class AMQPMessageSender {
     		msgCtx.setProperty(AMQPConstants.AMQP_MESSAGE_ID, msgId);
     	}
 
-
-    	if (log.isDebugEnabled()) {
-    		log.debug("Sent Message Context ID : " + msgCtx.getMessageID() +" with Message ID : " + msgId +" to destination : " + destination);
-    	}
-
+    	log.debug("Sent Message Context ID : " + msgCtx.getMessageID() +" with Message ID : " + msgId +" to destination : " + destination);
     }
 
     /**

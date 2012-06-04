@@ -272,8 +272,9 @@ public class AMQPUtils extends BaseUtils {
 	 * @param message
 	 *            the AMQP message
 	 * @return a Map of the transport headers
+	 * @throws AxisFault 
 	 */
-	public static Map<String, Object> getTransportHeaders(AMQPMessage message) {
+	public static Map<String, Object> getTransportHeaders(AMQPMessage message) throws AxisFault {
 		// create a Map to hold transport headers
 		Map<String, Object> map = new HashMap<String, Object>();
 		Map<String, Object> headers = message.getProperties().getHeaders();
@@ -304,7 +305,7 @@ public class AMQPUtils extends BaseUtils {
         map.put(AMQPConstants.AMQP_REDELIVERED, Boolean.toString(msg_env.isRedeliver()));
         // replyto destination name
         if (msg_prop.getReplyTo() != null) {
-            Destination dest = new Destination (msg_prop.getReplyTo());
+            Destination dest = DestinationFactory.parseAddress (msg_prop.getReplyTo());
             map.put(AMQPConstants.AMQP_REPLY_TO, dest);
         }
         // priority

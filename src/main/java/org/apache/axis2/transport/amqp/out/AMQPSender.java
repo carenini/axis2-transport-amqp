@@ -20,7 +20,6 @@ import org.apache.axiom.om.OMElement;
 import org.apache.axiom.om.OMText;
 import org.apache.axiom.om.OMNode;
 import org.apache.axis2.AxisFault;
-import org.apache.axis2.Constants;
 import org.apache.axis2.context.MessageContext;
 import org.apache.axis2.context.ConfigurationContext;
 import org.apache.axis2.description.TransportOutDescription;
@@ -43,7 +42,10 @@ import org.apache.axis2.transport.amqp.common.DestinationFactory;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ConsumerCancelledException;
 import com.rabbitmq.client.Envelope;
+import com.rabbitmq.client.QueueingConsumer;
+import com.rabbitmq.client.ShutdownSignalException;
 
 import javax.activation.DataHandler;
 
@@ -63,9 +65,6 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 
 	/**
 	 * The AMQP connection factory manager to be used when sending messages out
-	 * 
-	 * @uml.property name="connFacManager"
-	 * @uml.associationEnd readOnly="true"
 	 */
 	private AMQPConnectionFactoryManager connFacManager;
 
@@ -189,18 +188,24 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		Envelope msg_env=null;
 		String correlationId = null;
 		String replyDestType = null;
-		String replyDestName = null; 
-
+		String replyDestName = null;
+		Destination replyDestination = null;
+		
 		// should we wait for a synchronous response on this same thread?
 		boolean waitForResponse = waitForSynchronousResponse(msgCtx);
 
 		message = createMessage(msgCtx, contentTypeProperty);
 		msg_env=message.getEnvelope();
 		msg_prop=message.getProperties();
-		Destination replyDestination = amqpOut.getReplyDestination();
+		correlationId=msg_prop.getCorrelationId();
+		if ((correlationId==null)||(correlationId.equals(""))) {
+			correlationId=UUID.randomUUID().toString();
+			msg_prop=msg_prop.builder().correlationId(correlationId).build();
+		}
+		 
+		replyDestination=amqpOut.getReplyDestination();
 
-		// if this is a synchronous out-in, prepare to listen on the response
-		// destination
+		// if this is a synchronous out-in, prepare to listen on the response destination
 		if (waitForResponse) {
 
 			replyDestName=(String) msgCtx.getProperty(AMQPConstants.AMQP_REPLY_TO);
@@ -216,31 +221,19 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 			replyDestination=DestinationFactory.exchangeDestination(replyDestName, Destination.param_to_destination_type(replyDestType), null);
 		}
 
-		messageSender.send(message, msgCtx);
-		metrics.incrementMessagesSent(msgCtx);
+		try {
+			messageSender.send(message, msgCtx);
+		} catch (IOException e) {
+			log.error(e);
+		}
 
+		metrics.incrementMessagesSent(msgCtx);
 		metrics.incrementBytesSent(msgCtx, message.getProperties().getBodySize());
 
 		// if we are expecting a synchronous response back for the message sent
 		// out
 		if (waitForResponse) {
-			// TODO
-			// ********************************************************************************
-			// TODO **** replace with asynchronous polling via a poller task to
-			// process this *******
-			// information would be given. Then it should poll (until timeout)
-			// the
-			// requested destination for the response message and inject it from
-			// a
-			// asynchronous worker thread
-			
-			messageSender.getConnection().start(); // multiple calls are safely ignored
-			correlationId = msg_prop.getCorrelationId();
-
-			// We assume here that the response uses the same message property to specify the content type of the message.
-			waitForResponseAndProcess(messageSender.getSession(), replyDestination, msgCtx, correlationId, contentTypeProperty);
-			// TODO
-			// ********************************************************************************
+			waitForResponseAndProcess(chan, replyDestination, msgCtx, correlationId, contentTypeProperty);
 		}
 	}
 
@@ -262,46 +255,58 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	 *             on error
 	 */
 	private void waitForResponseAndProcess(Channel chan, Destination replyDestination, MessageContext msgCtx, String correlationId, String contentTypeProperty) throws AxisFault {
+		boolean autoAck = false;
+		byte[] body = null;
+		AMQP.BasicProperties props = null;
+		long deliveryTag = 0;
+		QueueingConsumer qi=new QueueingConsumer(chan);
+		QueueingConsumer.Delivery delivery = null;
+		String waitReply = null;
+		long timeout = AMQPConstants.DEFAULT_AMQP_TIMEOUT;
 
-		//try {
-			Consumer consumer;
-			consumer = AMQPUtils.createConsumer(chan, replyDestination, "AMQPCorrelationID = '" + correlationId + "'");
+		waitReply=(String) msgCtx.getProperty(AMQPConstants.AMQP_WAIT_REPLY);
+		if (waitReply != null)
+			timeout = Long.valueOf(waitReply).longValue();
 
-			// how long are we willing to wait for the sync response
-			long timeout = AMQPConstants.DEFAULT_AMQP_TIMEOUT;
-			String waitReply = (String) msgCtx.getProperty(AMQPConstants.AMQP_WAIT_REPLY);
-			if (waitReply != null) {
-				timeout = Long.valueOf(waitReply).longValue();
-			}
-
-			if (log.isDebugEnabled()) {
-				log.debug("Waiting for a maximum of " + timeout + "ms for a response message to destination : " + replyDestination + " with AMQP correlation ID : " + correlationId);
-			}
-
-			AMQPMessage reply = consumer.receive(timeout);
-
-			if (reply != null) {
-				// update transport level metrics
-				metrics.incrementMessagesReceived();
-				metrics.incrementBytesReceived(reply.getProperties().getBodySize());
-
-				try {
-					processSyncResponse(msgCtx, reply, contentTypeProperty);
-					metrics.incrementMessagesReceived();
-				} catch (AxisFault e) {
-					metrics.incrementFaultsReceiving();
-					throw e;
-				}
-
-			} else {
+		log.debug("Waiting for a maximum of " + timeout + "ms for a response message to destination : " + replyDestination + " with AMQP correlation ID : " + correlationId);
+		try {
+			delivery = qi.nextDelivery(timeout);
+			if (delivery == null) {
+				// shut down your consumer here - no events arrived
+				// before the timeout was reached
 				log.warn("Did not receive a AMQP response within " + timeout + " ms to destination : " + replyDestination + " with AMQP correlation ID : " + correlationId);
 				metrics.incrementTimeoutsReceiving();
+				return;
 			}
-
-		/*} catch (AMQPException e) {
+			else {
+				props=delivery.getProperties();
+				body=delivery.getBody();
+				deliveryTag=delivery.getEnvelope().getDeliveryTag();
+				AMQPMessage reply=new AMQPMessage(""+deliveryTag, delivery.getEnvelope(), props, body);
+				if (correlationId.equals(props.getCorrelationId())) {
+					chan.basicAck(deliveryTag, false); // acknowledge receipt of the message
+					metrics.incrementMessagesReceived();
+					metrics.incrementBytesReceived(props.getBodySize());
+					processSyncResponse(msgCtx, reply, contentTypeProperty);
+					metrics.incrementMessagesReceived();
+				}
+			}
+		} catch (AxisFault e) {
 			metrics.incrementFaultsReceiving();
-			handleException("Error creating a consumer, or receiving a synchronous reply " + "for outgoing MessageContext ID : " + msgCtx.getMessageID() + " and reply Destination : " + replyDestination, e);
-		}*/
+			throw e;
+		} catch (IOException e) {
+			log.error("Exception while acking message: "+e);
+		} catch (ShutdownSignalException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ConsumerCancelledException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 
 	/**
