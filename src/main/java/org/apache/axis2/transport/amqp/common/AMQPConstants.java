@@ -228,7 +228,6 @@ public class AMQPConstants {
 	public static final String PARAM_AMQP_USERNAME = "transport.amqp.username";
 	public static final String PARAM_AMQP_VHOST = "transport.amqp.virtualhost";
 
-	// TODO fill from JMS Constants
 	public static final String DELIVERY_MODE = null;
 
 	public static final String PRIORITY = null;
@@ -278,7 +277,7 @@ public class AMQPConstants {
     public static final String REPLY_EXCHANGE_TYPE_PARAM = "transport.amqp.ReplyExchangeType";
     public static final String REPLY_EXCHANGE_NAME_PARAM = "transport.amqp.ReplyExchangeName";
     /**
-     * The Parameter name indicating the response AMQP destination class.Ex direct,topic,fannot ..etc
+     * The Parameter name indicating the response AMQP destination class.Ex direct,topic,fanout ..etc
      */
     public static final String REPLY_ROUTING_KEY_PARAM = "transport.amqp.ReplyRoutingKey";
 

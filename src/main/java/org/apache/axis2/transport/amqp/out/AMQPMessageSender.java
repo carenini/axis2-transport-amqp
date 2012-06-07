@@ -26,11 +26,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.axis2.context.MessageContext;
 import org.apache.axis2.transport.amqp.common.AMQPConstants;
 import org.apache.axis2.transport.amqp.common.AMQPMessage;
-import org.apache.axis2.transport.amqp.common.AxisAMQPException;
 import org.apache.axis2.transport.amqp.common.Destination;
-import org.apache.axis2.transport.base.BaseConstants;
-
-
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
 
@@ -64,17 +60,10 @@ public class AMQPMessageSender {
      */
     public void send(AMQPMessage message, MessageContext msgCtx) throws IOException {
 
-    	Boolean jtaCommit    = getBooleanProperty(msgCtx, BaseConstants.JTA_COMMIT_AFTER_SEND);
-    	Boolean rollbackOnly = getBooleanProperty(msgCtx, BaseConstants.SET_ROLLBACK_ONLY);
     	Boolean persistent   = getBooleanProperty(msgCtx, AMQPConstants.DELIVERY_MODE);
     	Integer priority     = getIntegerProperty(msgCtx, AMQPConstants.PRIORITY);
     	Integer timeToLive   = getIntegerProperty(msgCtx, AMQPConstants.TIME_TO_LIVE);
     	BasicProperties msg_prop = null;
-
-    	// Do not commit, if message is marked for rollback
-    	if (rollbackOnly != null && rollbackOnly) {
-    		jtaCommit = Boolean.FALSE;
-    	}
 
     	msg_prop=message.getProperties();
     	if (persistent != null) {
@@ -118,10 +107,12 @@ public class AMQPMessageSender {
 		}
     }
 
+    /*
     private void handleException(String message, Exception e) {
         log.error(message, e);
         throw new AxisAMQPException(message, e);
     }
+    */
 
     private Boolean getBooleanProperty(MessageContext msgCtx, String name) {
         Object o = msgCtx.getProperty(name);

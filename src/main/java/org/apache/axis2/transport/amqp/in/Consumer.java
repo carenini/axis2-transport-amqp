@@ -2,9 +2,7 @@ package org.apache.axis2.transport.amqp.in;
 
 import java.io.IOException;
 
-import org.apache.axis2.transport.amqp.common.AMQPEndpoint;
 import org.apache.axis2.transport.amqp.common.AMQPMessage;
-import org.apache.axis2.transport.amqp.common.IncomingMessageHandler;
 import org.apache.axis2.transport.base.threads.WorkerPool;
 
 import com.rabbitmq.client.AMQP;

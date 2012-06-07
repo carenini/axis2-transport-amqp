@@ -71,6 +71,10 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 */
 	private String contentType;
 
+	/*Connection details */
+	private String pass;
+	private String user;
+
 	/**
 	 * Creates an instance using the given AMQP connection factory and
 	 * destination
@@ -113,14 +117,16 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		
 			contentType = properties.get(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
 
-			replyDestination = getReplyDestination(targetEPR);
-			
 			// FIXME extract routing keys
 			if(destinationType==AMQPConstants.QUEUE) destination=DestinationFactory.queueDestination(destinationName);
 			else destination=DestinationFactory.exchangeDestination(destinationName, destinationType, null);
 			
 			if(replyDestinationType==AMQPConstants.QUEUE) replyDestination=DestinationFactory.queueDestination(replyDestinationName);
 			else replyDestination=DestinationFactory.exchangeDestination(replyDestinationName, replyDestinationType, null);
+			
+			// create a one time connection and session to be used
+			user = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_USERNAME) : null;
+			pass = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_PASSWORD) : null;
 		}
 	}
 
@@ -174,10 +180,12 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		throw new AxisAMQPException(s);
 	}
 
+	/*
 	private void handleException(String s, Exception e) {
 		log.error(s, e);
 		throw new AxisAMQPException(s, e);
 	}
+	*/
 
 	public Destination getDestination() {
 		return destination;
@@ -232,9 +240,7 @@ public class AMQPTransportInfo implements OutTransportInfo {
 		Connection connection = null;
 		int dest_type=-1;
 		
-		// create a one time connection and session to be used
-		String user = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_USERNAME) : null;
-		String pass = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_PASSWORD) : null;
+
 
 		if (connection == null) {
 			connection = amqpConnectionFactory != null ? amqpConnectionFactory.getConnection() : null;
@@ -251,11 +257,6 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	}
 
 	public Object getConnectionURL() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public Destination getReplyDestination(String replyDestName) {
 		// TODO Auto-generated method stub
 		return null;
 	}

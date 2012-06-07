@@ -201,7 +201,6 @@ public class AMQPUtils extends BaseUtils {
 		if (msg_prop==null) {
 			msg_prop=new AMQP.BasicProperties.Builder().build();
 		}
-		Envelope msg_env=message.getEnvelope();
 		
 		Map<?, ?> headerMap = (Map<?, ?>) msgContext.getProperty(MessageContext.TRANSPORT_HEADERS);
 
@@ -237,7 +236,6 @@ public class AMQPUtils extends BaseUtils {
 				msg_prop=msg_prop.builder().priority(priority).build();
 			} else if (AMQPConstants.AMQP_TIMESTAMP.equals(name)) {
 				timestamp=Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_TIMESTAMP));
-				//FIXME
 				msg_prop=msg_prop.builder().timestamp(new Date(timestamp)).build();
 			} else if (AMQPConstants.AMQP_MESSAGE_TYPE.equals(name)) {
 				msg_type=(String) headerMap.get(AMQPConstants.AMQP_MESSAGE_TYPE);

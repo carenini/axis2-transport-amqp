@@ -23,10 +23,7 @@ import org.apache.axis2.description.TransportInDescription;
 import org.apache.axis2.transport.amqp.common.AMQPConnectionFactory;
 import org.apache.axis2.transport.amqp.common.AMQPConnectionFactoryManager;
 import org.apache.axis2.transport.amqp.common.AMQPConstants;
-import org.apache.axis2.transport.amqp.common.AMQPEndpoint;
-import org.apache.axis2.transport.amqp.common.AMQPUtils;
 import org.apache.axis2.transport.amqp.common.AxisAMQPException;
-import org.apache.axis2.transport.amqp.common.ServiceTaskManager;
 import org.apache.axis2.transport.base.AbstractTransportListenerEx;
 import org.apache.axis2.transport.base.BaseConstants;
 import org.apache.axis2.transport.base.ManagementSupport;
@@ -97,21 +94,7 @@ public class AMQPListener extends AbstractTransportListenerEx<AMQPEndpoint> impl
 	@Override
 	protected void startEndpoint(AMQPEndpoint endpoint) throws AxisFault {
 		ServiceTaskManager stm = endpoint.getServiceTaskManager();
-
 		stm.start();
-
-		for (int i = 0; i < 3; i++) {
-			if (stm.getActiveTaskCount() > 0) {
-				log.info("Started to listen on destination : " + stm.getDestination().getName() + " of type " + AMQPUtils.getDestinationTypeAsString(stm.getDestinationType()) + " for service " + stm.getServiceName());
-				return;
-			}
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException ignore) {
-			}
-		}
-
-		log.warn("Polling tasks on destination : " + stm.getDestination().getName() + " of type " + AMQPUtils.getDestinationTypeAsString(stm.getDestinationType()) + " for service " + stm.getServiceName() + " have not yet started after 3 seconds ..");
 	}
 
 	/**
@@ -123,9 +106,7 @@ public class AMQPListener extends AbstractTransportListenerEx<AMQPEndpoint> impl
 	@Override
 	protected void stopEndpoint(AMQPEndpoint endpoint) {
 		ServiceTaskManager stm = endpoint.getServiceTaskManager();
-		if (log.isDebugEnabled()) {
-			log.debug("Stopping listening on destination : " + stm.getDestination().getName() + " for service : " + stm.getServiceName());
-		}
+		log.debug("Stopping listening on destination : " + stm.getDestination().getName() + " for service : " + stm.getServiceName());
 
 		stm.stop();
 

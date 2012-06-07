@@ -43,7 +43,6 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.ConsumerCancelledException;
-import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.QueueingConsumer;
 import com.rabbitmq.client.ShutdownSignalException;
 
@@ -152,14 +151,10 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		}
 
 		// The message property to be used to send the content type is
-		// determined by
-		// the out transport info, i.e. either from the EPR if we are sending a
-		// request,
-		// or, if we are sending a response, from the configuration of the
-		// service that
-		// received the request). The property name can be overridden by a
-		// message
-		// context property.
+		// determined by the out transport info, i.e. either from the EPR if we are sending a
+		// request, or, if we are sending a response, from the configuration of the
+		// service that received the request). The property name can be overridden by a
+		// message context property.
 		String contentTypeProperty = (String) msgCtx.getProperty(AMQPConstants.CONTENT_TYPE_PROPERTY_PARAM);
 		if (contentTypeProperty == null) {
 			contentTypeProperty = amqpOut.getContentTypeProperty();
@@ -185,7 +180,6 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		// over AMQP
 		AMQPMessage message = null;
 		AMQP.BasicProperties msg_prop=null;
-		Envelope msg_env=null;
 		String correlationId = null;
 		String replyDestType = null;
 		String replyDestName = null;
@@ -195,7 +189,6 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 		boolean waitForResponse = waitForSynchronousResponse(msgCtx);
 
 		message = createMessage(msgCtx, contentTypeProperty);
-		msg_env=message.getEnvelope();
 		msg_prop=message.getProperties();
 		correlationId=msg_prop.getCorrelationId();
 		if ((correlationId==null)||(correlationId.equals(""))) {
@@ -255,7 +248,6 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	 *             on error
 	 */
 	private void waitForResponseAndProcess(Channel chan, Destination replyDestination, MessageContext msgCtx, String correlationId, String contentTypeProperty) throws AxisFault {
-		boolean autoAck = false;
 		byte[] body = null;
 		AMQP.BasicProperties props = null;
 		long deliveryTag = 0;
@@ -328,11 +320,9 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	private AMQPMessage createMessage(MessageContext msgContext, String contentTypeProperty) throws AMQPException, AxisFault {
 
 		AMQPMessage message = null;
-		Envelope msg_env=null;
 		AMQP.BasicProperties msg_prop=null;
 		ByteArrayOutputStream bos=null;
 		OutputStream out=null;
-		byte[] msg_payload=null;
 		String contentType = null;
 		String payloadType = null;
 		Map<String, Object> headers = null;
