@@ -15,14 +15,7 @@
  */
 package org.apache.axis2.transport.amqp.in;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.axis2.description.AxisService;
-import org.apache.axis2.description.Parameter;
 import org.apache.axis2.transport.amqp.common.AMQPConnectionFactory;
-import org.apache.axis2.transport.amqp.common.AMQPConstants;
 import org.apache.axis2.transport.amqp.common.Destination;
 import org.apache.axis2.transport.base.threads.WorkerPool;
 
@@ -39,47 +32,14 @@ public class ServiceTaskManagerFactory {
 	 * @param workerPool
 	 * @return
 	 */
-	public static ServiceTaskManager createTaskManagerForService(AMQPConnectionFactory jcf, AxisService service, WorkerPool workerPool) {
-		Destination dest=null;
-		String name = service.getName();
-		Map<String, String> svc = getServiceStringParameters(service.getParameters());
-		Map<String, String> cf = jcf.getParameters();
-
+	public static ServiceTaskManager createTaskManagerForService(AMQPConnectionFactory jcf, AMQPEndpoint ep, String service_name, Destination in_dest, WorkerPool workerPool) {
 		ServiceTaskManager stm = new ServiceTaskManager();
-        Integer value = null;
-
-		stm.setServiceName(name);
-
-		//TODO create the Destination
-		
-		String destName = getOptionalStringProperty(AMQPConstants.PARAM_DESTINATION, svc, cf);
-		if (destName == null) {
-			destName = service.getName();
-		}
-
+		stm.setEndpoint(ep);
+		stm.setServiceName(service_name);
+		stm.setDestination(in_dest);
 		stm.setWorkerPool(workerPool);
 
 		return stm;
-	}
-
-	private static Map<String, String> getServiceStringParameters(List<Parameter> list) {
-
-		Map<String, String> map = new HashMap<String, String>();
-		for (Parameter p : list) {
-			if (p.getValue() instanceof String) {
-				map.put(p.getName(), (String) p.getValue());
-			}
-		}
-		return map;
-	}
-
-	private static String getOptionalStringProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
-
-		String value = svcMap.get(key);
-		if (value == null) {
-			value = cfMap.get(key);
-		}
-		return value;
 	}
 
 }

@@ -52,6 +52,8 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 * to the AMQP provider and optionally a session already available for use
 	 */
 	private AMQPConnectionFactory amqpConnectionFactory = null;
+	private Channel chan=null;
+	private Connection conn=null;
 	/** the Destination queue or topic for the outgoing message */
 	private Destination destination = null;
 
@@ -70,10 +72,6 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 * message
 	 */
 	private String contentType;
-
-	/*Connection details */
-	private String pass;
-	private String user;
 
 	/**
 	 * Creates an instance using the given AMQP connection factory and
@@ -123,69 +121,14 @@ public class AMQPTransportInfo implements OutTransportInfo {
 			
 			if(replyDestinationType==AMQPConstants.QUEUE) replyDestination=DestinationFactory.queueDestination(replyDestinationName);
 			else replyDestination=DestinationFactory.exchangeDestination(replyDestinationName, replyDestinationType, null);
-			
-			// create a one time connection and session to be used
-			user = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_USERNAME) : null;
-			pass = properties != null ? properties.get(AMQPConstants.PARAM_AMQP_PASSWORD) : null;
+		
 		}
 	}
 
-	/**
-	 * Provides a lazy load when created with a target EPR. This method performs
-	 * actual lookup for the connection factory and destination
-	 */
-/*	public void loadConnectionFactoryFromProperies() {
-		if (properties != null) {
-			connectionFactory = getConnectionFactory(properties);
-		}
-	}
-*/
-	/**
-	 * Get the referenced ConnectionFactory using the properties from the
-	 * context
-	 * 
-	 * @param context
-	 *            the context to use for lookup
-	 * @param props
-	 *            the properties which contains the JNDI name of the factory
-	 * @return the connection factory
-	 */
-/*	private ConnectionFactory getConnectionFactory(Hashtable<String, String> props) {
-		String conFacId = props.get(AMQPConstants.PARAM_CONFAC_ID);
-		if (conFacId != null) {
-			return AMQPUtils.lookup(ConnectionFactory.class, conFacId);
-		} else {
-			handleException("Connection Factory JNDI name cannot be determined");
-		}
-		return null;
-	}
-*/
-	/**
-	 * Get the AMQP destination specified by the given URL from the context
-	 * 
-	 * @param context
-	 *            the Context to lookup
-	 * @param url
-	 *            URL
-	 * @return the AMQP destination, or null if it does not exist
-	 */
-/*	private Destination getDestination(String url) {
-		Destination d = AMQPUtils.getDestination(url);
-		log.debug("Lookup the AMQP destination " + d.getName() + " of type " + d.getType() + " extracted from the URL " + url);
-		return d;
-	}
-*/
 	private void handleException(String s) {
 		log.error(s);
 		throw new AxisAMQPException(s);
 	}
-
-	/*
-	private void handleException(String s, Exception e) {
-		log.error(s, e);
-		throw new AxisAMQPException(s, e);
-	}
-	*/
 
 	public Destination getDestination() {
 		return destination;
@@ -236,24 +179,23 @@ public class AMQPTransportInfo implements OutTransportInfo {
 	 *             on errors, to be handled and logged by the caller
 	 */
 	public AMQPMessageSender createAMQPSender() throws IOException {
-		Channel chan = null;
-		Connection connection = null;
-		int dest_type=-1;
-		
-
-
-		if (connection == null) {
-			connection = amqpConnectionFactory != null ? amqpConnectionFactory.getConnection() : null;
-		}
-
-		dest_type=destination.getType();
-		chan=connection.createChannel();
-		if (connection != null) {
-			if (dest_type == AMQPConstants.QUEUE) chan.queueDeclare(destination.getName(), false, false, true, null);
-			// TODO Exchange type
-			else chan.exchangeDeclare(destination.getName(), "direct", true);
-		}
+		if ((conn==null)||(chan==null)||(!chan.isOpen()))
+			setup_amqp();
 		return new AMQPMessageSender(chan, destination);
+	}
+	
+	private void setup_amqp() throws IOException{
+		int dest_type=-1;
+		if (conn == null)
+			conn = amqpConnectionFactory != null ? amqpConnectionFactory.getConnection() : null;
+			dest_type=destination.getType();
+			chan=conn.createChannel();
+
+			// TODO check durable and autodelete flags
+			if (conn != null) {
+				if (dest_type == AMQPConstants.QUEUE) chan.queueDeclare(destination.getName(), false, false, true, null);
+				else chan.exchangeDeclare(destination.getName(), Destination.destination_type_to_param(destination.getType()), true);
+			}
 	}
 
 	public Object getConnectionURL() {

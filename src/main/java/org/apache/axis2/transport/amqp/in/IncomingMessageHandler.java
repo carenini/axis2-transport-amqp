@@ -8,7 +8,7 @@ import org.apache.axis2.transport.amqp.common.AMQPConstants;
 import org.apache.axis2.transport.amqp.common.AMQPMessage;
 import org.apache.axis2.transport.amqp.common.AMQPTransportInfo;
 import org.apache.axis2.transport.amqp.common.AMQPUtils;
-import org.apache.axis2.transport.amqp.common.DestinationFactory;
+import org.apache.axis2.transport.amqp.common.Destination;
 import org.apache.axis2.transport.base.BaseConstants;
 import org.apache.axis2.transport.base.MetricsCollector;
 import org.apache.commons.logging.Log;
@@ -36,6 +36,7 @@ public class IncomingMessageHandler implements Runnable {
 		String msg_id=null; 
 		String reply_to=null;
 		MessageContext msgContext =null;
+		Destination d=null;
 		
 		try {
 
@@ -67,14 +68,13 @@ public class IncomingMessageHandler implements Runnable {
 			if (reply_to == null) {
 				log.debug("Messsage");
 				// does the service specify a default reply destination ?
-				String replyDestinationAddress = endpoint.getReplyDestinationAddress();
-				if (replyDestinationAddress != null) {
-					reply_to = replyDestinationAddress;
-				}
+				d = endpoint.getSource();
+				if (d != null)
+					reply_to = d.toAddress();
 			}
 			
 			if (reply_to != null) {
-				msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(cf, DestinationFactory.queueDestination(reply_to), contentTypeInfo));
+				msgContext.setProperty(Constants.OUT_TRANSPORT_INFO, new AMQPTransportInfo(cf, new Destination(reply_to), contentTypeInfo));
 			}
 
 			AMQPUtils.setSOAPEnvelope(message, msgContext, contentTypeInfo);

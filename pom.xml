@@ -67,8 +67,15 @@
 		</plugins>
 	</build>
 
+    <repositories>
+        <repository>
+            <id>org.springframework.maven.milestone</id>
+            <name>Spring Framework Maven Milestone Repository</name>
+            <url>http://maven.springframework.org/milestone</url>
+        </repository>
+    </repositories>
 
-	<dependencies>
+    <dependencies>
 		<dependency>
 			<groupId>com.rabbitmq</groupId>
 			<artifactId>amqp-client</artifactId>
@@ -83,9 +90,13 @@
 			<groupId>org.apache.axis2</groupId>
 			<artifactId>axis2-transport-testkit</artifactId>
 			<version>${axis2-testkit-version}</version>
-	
 			<scope>test</scope>
-		</dependency>
+        </dependency>
+        <dependency>
+            <groupId>org.cloudfoundry</groupId>
+            <artifactId>cloudfoundry-runtime</artifactId>
+            <version>${cloudfoundry-version}</version>
+        </dependency>
 	</dependencies>
 
 </project>

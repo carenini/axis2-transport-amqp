@@ -51,7 +51,7 @@ public class AMQPConnectionFactoryManager {
      * @param trpDesc the transport description for AMQP
      */
     private void loadConnectionFactoryDefinitions(ParameterInclude trpDesc) {
-
+    	log.info("Parameters: "+trpDesc);
         for (Parameter p : trpDesc.getParameters()) {
             try {
                 AMQPConnectionFactory amqpConFactory = new AMQPConnectionFactory(p);

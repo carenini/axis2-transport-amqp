@@ -10,6 +10,7 @@ import org.apache.axis2.transport.base.threads.WorkerPool;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import com.rabbitmq.client.AMQP.Queue.DeclareOk;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
@@ -26,7 +27,6 @@ import com.rabbitmq.client.Connection;
  * service, by discarding all connections.
  */
 public class ServiceTaskManager {
-	 /** The logger */
     private static final Log log = LogFactory.getLog(ServiceTaskManager.class);
     
     private static final int STATE_STOPPED = 0; /** The Task manager is stopped or has not started */
@@ -65,7 +65,9 @@ public class ServiceTaskManager {
 		message_consumer=new Consumer(endpoint, null, workerPool);
 		Destination source=null;
 		String queue_name=null;
+		String exchange_name=null;
 		String routing_key=null;
+		DeclareOk res=null;
 
 		if (serviceTaskManagerState == STATE_PAUSED) {
 			log.info("Attempt to re-start paused TaskManager is ignored. Please use resume instead");
@@ -78,10 +80,17 @@ public class ServiceTaskManager {
 			source=endpoint.getSource();
 			chan=sharedConnection.createChannel();
 
-			if (source.getType()!=AMQPConstants.QUEUE)
+			if (source.getType()!=AMQPConstants.QUEUE) {
 				queue_name=source.getName();
+				if (! queue_name.equals(chan.queueDeclarePassive(queue_name).getQueue()) )
+					chan.queueDeclare(queue_name, false, false, true, null);
+			}
 			else {
+				exchange_name=source.getName();
 				queue_name = chan.queueDeclare().getQueue();
+				if  (chan.exchangeDeclarePassive(source.getName())==null)  {
+					chan.exchangeDeclare(exchange_name, Destination.destination_type_to_param(source.getType()));
+				}
 				routing_key=source.getRoutingKey();
 				// If routing key is not present, subscribe to everything
 				if ((routing_key==null)&&(source.getType()==AMQPConstants.TOPIC_EXCHANGE)) routing_key="#";

@@ -24,6 +24,8 @@ import org.apache.axis2.description.Parameter;
 import org.apache.axis2.description.ParameterIncludeImpl;
 import org.apache.axis2.AxisFault;
 import org.apache.axiom.om.OMElement;
+import org.cloudfoundry.runtime.env.CloudEnvironment;
+import org.cloudfoundry.runtime.env.RabbitServiceInfo;
 
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -65,12 +67,28 @@ public class AMQPConnectionFactory {
             parameters.put(p.getName(), (String) p.getValue());
         }
 
-        //TODO: get the parameters from CloudFoundry
-        confac.setHost(parameters.get(AMQPConstants.PARAM_AMQP_HOST));
-        confac.setPassword(parameters.get(AMQPConstants.PARAM_AMQP_PASSWORD)); 
-        confac.setPort(Integer.parseInt(parameters.get(AMQPConstants.PARAM_AMQP_PORT))); 
-        confac.setUsername(parameters.get(AMQPConstants.PARAM_AMQP_USERNAME)); 
-        confac.setVirtualHost(parameters.get(AMQPConstants.PARAM_AMQP_VHOST));
+        log.info("Connection factory parameters: "+parameters);
+        if (AMQPConstants.EXECUTION_CLOUD.equals(parameters.get(AMQPConstants.PARAM_EXECUTION_ENV))){
+        	CloudEnvironment environment= new CloudEnvironment();
+        	String cf_servicename=parameters.get(AMQPConstants.PARAM_AMQP_SERVICENAME);
+        	RabbitServiceInfo service = environment.getServiceInfo(cf_servicename,RabbitServiceInfo.class);
+        	if (service==null) 
+        		log.error("Cannot retrieve CF service "+cf_servicename);
+        	log.info("Initialising AMQP ConnectionFactory : " + name + " using CloudFoundry data: "+service);
+        	confac.setHost(service.getHost());
+        	confac.setPort(service.getPort());
+        	confac.setUsername(service.getUserName());
+        	confac.setPassword(service.getPassword());
+        	confac.setVirtualHost(service.getVirtualHost());
+        }
+        else {
+        	confac.setHost(parameters.get(AMQPConstants.PARAM_AMQP_HOST));
+        	confac.setPassword(parameters.get(AMQPConstants.PARAM_AMQP_PASSWORD)); 
+            confac.setPort(Integer.parseInt(parameters.get(AMQPConstants.PARAM_AMQP_PORT))); 
+            confac.setUsername(parameters.get(AMQPConstants.PARAM_AMQP_USERNAME)); 
+            confac.setVirtualHost(parameters.get(AMQPConstants.PARAM_AMQP_VHOST));
+        }
+        
 		log.info("AMQP ConnectionFactory : " + name + " initialized");
 
     }
@@ -97,7 +115,7 @@ public class AMQPConnectionFactory {
     }
 
     /**
-     * Get a new Connection or shared Connection from this AMQP CF
+     * Get a new Connection from this AMQP CF
      * @return new or shared Connection from this AMQP CF
      * @throws IOException 
      */

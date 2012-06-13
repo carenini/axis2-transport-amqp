@@ -104,10 +104,6 @@ public class AMQPConstants {
      * until such time full support is implemented for it.
      */
     public static final String PARAM_PUBLISH_EPR = "transport.amqp.PublishEPR";
-    /** The parameter indicating the JMS API specification to be used - if this is "1.1" the JMS
-     * 1.1 API would be used, else the JMS 1.0.2B
-     */
-    public static final String PARAM_JMS_SPEC_VER = "transport.amqp.JMSSpecVersion";
 
     /**
      * The Parameter indicating whether the JMS Session should be transacted for the service
@@ -191,10 +187,6 @@ public class AMQPConstants {
      */
     public static final String AMQP_TEXT_MESSAGE = "AMQP_TEXT_MESSAGE";
     /**
-     * A MessageContext property or client Option indicating the time to wait for a response JMS message
-     */
-    public static final String JMS_WAIT_REPLY = "JMS_WAIT_REPLY";
-    /**
      * A MessageContext property or client Option indicating the JMS correlation id
      */
     public static final String AMQP_CORRELATION_ID = "AMQP_CORRELATION_ID";
@@ -223,8 +215,8 @@ public class AMQPConstants {
     public static final String DESTINATION_TYPE_FANOUT = "generic";
 
 	public static final String PARAM_AMQP_HOST = "transport.amqp.hostname";
-	public static final String  PARAM_AMQP_PASSWORD= "transport.amqp.password";
-	public static final String  PARAM_AMQP_PORT= "transport.amqp.port";
+	public static final String PARAM_AMQP_PASSWORD= "transport.amqp.password";
+	public static final String PARAM_AMQP_PORT= "transport.amqp.port";
 	public static final String PARAM_AMQP_USERNAME = "transport.amqp.username";
 	public static final String PARAM_AMQP_VHOST = "transport.amqp.virtualhost";
 
@@ -344,4 +336,10 @@ public class AMQPConstants {
      * A MessageContext property or client Option stating the AMQP type
      */
     public static final String AMQP_CONTENT_TYPE = "AMQP_CONTENT_TYPE";
+
+	public static final String PARAM_EXECUTION_ENV = "execution_environment";
+	public static final String EXECUTION_LOCAL = "local";
+	public static final String EXECUTION_CLOUD = "cloudfoundry";
+
+	public static final String PARAM_AMQP_SERVICENAME = "cloudfoundry.amqp.servicename";
 }

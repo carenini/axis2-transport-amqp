@@ -94,7 +94,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
      */
     private String getEPR() {
         StringBuffer sb = new StringBuffer();
-
+        log.info("EPR params: "+cf.getParameters()+ " - sink: "+sink);
         sb.append(AMQPConstants.AMQP_PREFIX).append(sink.getName());
         sb.append("?").append(AMQPConstants.PARAM_DEST_TYPE).append("=").append(Destination.destination_type_to_param(source.getType()));
             
@@ -128,6 +128,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
         String sinkName=null;
         int sinkType=0;
         
+        log.info("Params of type "+params.getClass());
     	// We only support endpoints configured at service level
         if (!(params instanceof AxisService)) return false;
                
@@ -164,11 +165,6 @@ public class AMQPEndpoint extends ProtocolEndpoint {
             log.debug("AMQP reply destination type not given. default queue");
             sourceType = AMQPConstants.QUEUE;
         }
-        
-        // compute service EPR and keep for later use
-        computeEPRs();         
-        
-        serviceTaskManager = ServiceTaskManagerFactory.createTaskManagerForService(cf, service, workerPool);
 
         if (sourceType==AMQPConstants.QUEUE) source=DestinationFactory.queueDestination(sourceName);
         else source=DestinationFactory.exchangeDestination(sourceName, sourceType, null);
@@ -176,13 +172,11 @@ public class AMQPEndpoint extends ProtocolEndpoint {
         if (sinkType==AMQPConstants.QUEUE) sink=DestinationFactory.queueDestination(sinkName);
         else sink=DestinationFactory.exchangeDestination(sinkName, sinkType, null);
         
+        // compute service EPR and keep for later use
+        computeEPRs(); 
+        serviceTaskManager = ServiceTaskManagerFactory.createTaskManagerForService(cf,this, service.getName(), source, workerPool);
         return true;
     }
-
- 	public String getReplyDestinationAddress() {
-		// TODO Auto-generated method stub
-		return null;
-	}
 
 	public AMQPListener getAmqpListener() {
 		return amqp_listener;

@@ -8,7 +8,7 @@ import org.apache.axis2.AxisFault;
 
 /** sample uri formats - this is temporary until the AMQP WG defines a proper addressing scheme
 *
-* uri="amqp:/direct/amq.direct?transport.amqp.RoutingKey=SimpleStockQuoteService&amp;transport.amqp.ConnectionURL=qpid:virtualhost=test;client_id=foo@tcp:myhost.com:5672"
+* uri="amqp:/direct/amq.direct?routingKey=SimpleStockQuoteService&amp;transport.amqp.ConnectionURL=qpid:virtualhost=test;client_id=foo@tcp:myhost.com:5672"
 * amqp:/topic/amq.topic?transport.amqp.RoutingKey=weather.us.ny&amp;transport.amqp.ConnectionURL=qpid:virtualhost=test;client_id=foo@tcp:myhost.com:5672
 */
 public class Destination {
@@ -20,7 +20,20 @@ public class Destination {
     
     public Destination(){
     }
-
+    
+    /** 
+     * @param amqp_addr: address amqp:/[queue|topic|direct|fanout]/name?routingKey=weather.us.ny */
+    public Destination(String amqp_addr) {
+    	Map<String, String> address_properties = null; 
+    	address_properties=parse(amqp_addr);
+    	name=address_properties.get(AMQPConstants.EXCHANGE_NAME_PARAM);
+    	try {
+			type=param_to_destination_type(address_properties.get(AMQPConstants.EXCHANGE_TYPE_PARAM));
+		} catch (AxisFault e) {
+			e.printStackTrace();
+		}
+    	routingKey=address_properties.get("routingKey");
+    }
     
     public String getRoutingKey()
     {
@@ -83,8 +96,12 @@ public class Destination {
 	}
 
 	public String toAddress(){
-		return null;
+		return "amqp:/"+destination_type_to_param(type)+"/"+name+"?routingKey="+routingKey;
 		
+	}
+	
+	public String toString(){
+		return toAddress();
 	}
 	
 	public static int param_to_destination_type(String value) throws AxisFault{

@@ -121,7 +121,6 @@ public class AMQPUtils extends BaseUtils {
 	 */
 	public static void setSOAPEnvelope(AMQPMessage message, MessageContext msgContext, String contentType) throws AxisFault, AMQPException {
 		BasicProperties msg_prop=message.getProperties();
-		Envelope env=message.getEnvelope();
 		
 		if (contentType == null) {
 			contentType=msg_prop.getContentType();
@@ -193,7 +192,6 @@ public class AMQPUtils extends BaseUtils {
 		int priority=0;
 		long timestamp=0;
 		String msg_type=null;
-		AMQP.BasicProperties.Builder header_builder=null;
 		AMQP.BasicProperties msg_prop=null;
 		Map<String,Object> headers=new HashMap<String,Object>();
 		
@@ -227,7 +225,7 @@ public class AMQPUtils extends BaseUtils {
 				}
 			} else if (AMQPConstants.AMQP_EXPIRATION.equals(name)) {
 				expiration=Long.parseLong((String) headerMap.get(AMQPConstants.AMQP_EXPIRATION));
-				msg_prop=msg_prop.builder().deliveryMode(delivery_mode).build();
+				msg_prop=msg_prop.builder().expiration(Long.toString(expiration)).build();
 			} else if (AMQPConstants.AMQP_MESSAGE_ID.equals(name)) {
 				message_id=(String) headerMap.get(AMQPConstants.AMQP_MESSAGE_ID);
 				msg_prop=msg_prop.builder().messageId(message_id).build();
