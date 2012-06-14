@@ -74,41 +74,70 @@ public class ServiceTaskManager {
 			return;
 		}
 
-		try {
-			confac=endpoint.getConnectionFactory();
-			sharedConnection=confac.getConnection();
-			source=endpoint.getSource();
-			chan=sharedConnection.createChannel();
 
-			if (source.getType()!=AMQPConstants.QUEUE) {
+		confac=endpoint.getConnectionFactory();
+		if (dest!=null)
+			source=dest;
+		else
+			source=endpoint.getSource();
+		try {
+			sharedConnection=confac.getConnection();
+			chan=sharedConnection.createChannel();
+			if (source.getType()==AMQPConstants.QUEUE) {
 				queue_name=source.getName();
-				if (! queue_name.equals(chan.queueDeclarePassive(queue_name).getQueue()) )
+				if (! check_destination(chan, source)) {		
 					chan.queueDeclare(queue_name, false, false, true, null);
+					log.info("Created queue "+queue_name);
+				}
 			}
 			else {
 				exchange_name=source.getName();
-				queue_name = chan.queueDeclare().getQueue();
-				if  (chan.exchangeDeclarePassive(source.getName())==null)  {
+				// DeclarePassive does not work as expected, this is a workaround
+				if (! check_destination(chan, source))
 					chan.exchangeDeclare(exchange_name, Destination.destination_type_to_param(source.getType()));
-				}
 				routing_key=source.getRoutingKey();
 				// If routing key is not present, subscribe to everything
 				if ((routing_key==null)&&(source.getType()==AMQPConstants.TOPIC_EXCHANGE)) routing_key="#";
 				else if (routing_key==null) routing_key="";
 
+				queue_name = chan.queueDeclare().getQueue();
+				log.info("Created queue "+queue_name);
 				chan.queueBind(queue_name, source.getName(), routing_key);
 			}
+
 			//FIXME what's the consumer tag?
 			chan.basicConsume(queue_name, true, "myConsumerTag", message_consumer);
 
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-        serviceTaskManagerState = STATE_STARTED;
-        log.info("Task manager for service : " + serviceName + " [re-]initialized");
-        log.info("Started to listen on destination : " + dest.getName() + 
+		serviceTaskManagerState = STATE_STARTED;
+		log.info("Task manager for service : " + serviceName + " [re-]initialized");
+		log.info("Started to listen on destination : " + dest.getName() + 
 				" of type " + AMQPUtils.getDestinationTypeAsString(dest.getType()) + 
 				" for service " + serviceName);
+
+	}
+	/** DeclarePassive does not work as expected, this is a workaround */
+	private boolean check_destination(Channel c, Destination d) {
+		boolean res=true;
+		try {
+			if (d.getType()==AMQPConstants.QUEUE) {
+				chan.queueDeclarePassive(d.getName());
+			}
+			else {
+				chan.exchangeDeclarePassive(d.getName());			
+			}
+		} catch (IOException e) {
+			res=false;
+		}
+		try {
+			if (! chan.isOpen())
+				chan=sharedConnection.createChannel();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return res;
 
 	}
 	
