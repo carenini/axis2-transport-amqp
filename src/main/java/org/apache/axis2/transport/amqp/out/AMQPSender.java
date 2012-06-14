@@ -97,9 +97,9 @@ public class AMQPSender extends AbstractTransportSender implements ManagementSup
 	private AMQPConnectionFactory getAMQPConnectionFactory(AMQPTransportInfo trpInfo) {
 		Map<String, String> props = trpInfo.getProperties();
 		if (trpInfo.getProperties() != null) {
-			String jmsConnectionFactoryName = props.get(AMQPConstants.PARAM_AMQP_CONFAC);
-			if (jmsConnectionFactoryName != null) {
-				return connFacManager.getAMQPConnectionFactory(jmsConnectionFactoryName);
+			String connectionFactoryName = props.get(AMQPConstants.PARAM_AMQP_CONFAC);
+			if (connectionFactoryName != null) {
+				return connFacManager.getAMQPConnectionFactory(connectionFactoryName);
 			} else {
 				return connFacManager.getAMQPConnectionFactory(props);
 			}
