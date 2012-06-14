@@ -1,1 +1,8 @@
 This is a prototype transport to allow SOAP over AMQP (RabbitMQ) in Apache Axis2.
+
+Instructions:
+* mvn package
+* place target/axis2-transport-amqp-0.0.1.jar inside Apache ODE WEB-INF/lib directory
+* download axis2-transport-base-1.0.0.jar and put it inside Apache ODE WEB-INF/lib directory
+* modify axis2.xml inside Apache ODE conf directory
+* ...and hope that it works :)

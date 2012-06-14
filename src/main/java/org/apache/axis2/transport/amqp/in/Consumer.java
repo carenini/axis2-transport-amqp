@@ -12,12 +12,10 @@ import com.rabbitmq.client.Envelope;
 
 public class Consumer extends DefaultConsumer {
 	private WorkerPool wp=null;
-	private AMQPEndpoint ep=null;
 	
-	public Consumer(AMQPEndpoint ep,Channel channel, WorkerPool wp) {
+	public Consumer(Channel channel, WorkerPool wp) {
 		super(channel);
 		this.wp=wp;
-		this.ep=ep;
 	}
 
 	public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
@@ -26,7 +24,7 @@ public class Consumer extends DefaultConsumer {
 		long deliveryTag = envelope.getDeliveryTag();
 		msg=new AMQPMessage(consumerTag, envelope, properties, body);
 		
-		handler=new IncomingMessageHandler(ep, msg);
+		handler=new IncomingMessageHandler(msg);
 		wp.execute(handler);
 		getChannel().basicAck(deliveryTag, false);
 	}

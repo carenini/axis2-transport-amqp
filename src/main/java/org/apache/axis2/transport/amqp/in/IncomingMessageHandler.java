@@ -23,8 +23,7 @@ public class IncomingMessageHandler implements Runnable {
     private MetricsCollector metrics = null;
     private AMQPMessage message=null;
     
-	public IncomingMessageHandler(AMQPEndpoint ep, AMQPMessage msg)  {
-		this.endpoint=ep;
+	public IncomingMessageHandler(AMQPMessage msg)  {
 		this.properties=msg.getProperties();
 		this.message=msg;
 	}

@@ -95,7 +95,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
     private String getEPR() {
         StringBuffer sb = new StringBuffer();
         log.info("EPR params: "+cf.getParameters()+ " - sink: "+sink);
-        sb.append(AMQPConstants.AMQP_PREFIX).append(sink.getName());
+        sb.append(AMQPConstants.AMQP_PREFIX).append("/").append(sink.getName());
         sb.append("?").append(AMQPConstants.PARAM_DEST_TYPE).append("=").append(Destination.destination_type_to_param(source.getType()));
             
        	for (Map.Entry<String, String> entry : cf.getParameters().entrySet()) {
@@ -174,7 +174,7 @@ public class AMQPEndpoint extends ProtocolEndpoint {
         
         // compute service EPR and keep for later use
         computeEPRs(); 
-        serviceTaskManager = ServiceTaskManagerFactory.createTaskManagerForService(cf,this, service.getName(), source, workerPool);
+        serviceTaskManager = ServiceTaskManagerFactory.createTaskManagerForService(cf, service.getName(), source, workerPool);
         return true;
     }
 

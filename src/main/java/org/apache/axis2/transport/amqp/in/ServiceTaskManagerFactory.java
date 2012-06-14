@@ -25,21 +25,15 @@ public class ServiceTaskManagerFactory {
 
 	/**
 	 * Create a ServiceTaskManager for the service passed in and its
-	 * corresponding JMSConnectionFactory
+	 * corresponding AMQPConnectionFactory
 	 * 
 	 * @param jcf
 	 * @param service
 	 * @param workerPool
 	 * @return
 	 */
-	public static ServiceTaskManager createTaskManagerForService(AMQPConnectionFactory jcf, AMQPEndpoint ep, String service_name, Destination in_dest, WorkerPool workerPool) {
-		ServiceTaskManager stm = new ServiceTaskManager();
-		stm.setEndpoint(ep);
-		stm.setServiceName(service_name);
-		stm.setDestination(in_dest);
-		stm.setWorkerPool(workerPool);
-
-		return stm;
+	public static ServiceTaskManager createTaskManagerForService(AMQPConnectionFactory jcf, String service_name, Destination in_dest, WorkerPool workerPool) {
+		return new ServiceTaskManager(service_name, jcf, in_dest, workerPool);
 	}
 
 }

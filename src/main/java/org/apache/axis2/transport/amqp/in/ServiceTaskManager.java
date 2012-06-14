@@ -10,7 +10,6 @@ import org.apache.axis2.transport.base.threads.WorkerPool;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.rabbitmq.client.AMQP.Queue.DeclareOk;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 
@@ -41,19 +40,16 @@ public class ServiceTaskManager {
     
 	private Channel chan = null; 
     private Consumer message_consumer=null;
-    private AMQPEndpoint endpoint=null;
     private AMQPConnectionFactory confac=null;
     private Connection sharedConnection = null;
 	private Destination dest=null;
 
 	
-	public ServiceTaskManager(String service_name, AMQPEndpoint ep) {
-		this();
+	public ServiceTaskManager(String service_name, AMQPConnectionFactory cf, Destination in_dest, WorkerPool wp) {
 		serviceName=service_name;
-		endpoint=ep;
-	}
-	
-	public ServiceTaskManager() {
+		workerPool=wp;
+		dest=in_dest;
+		confac=cf;
 	}
 
 	public int getDestinationType() {
@@ -62,47 +58,41 @@ public class ServiceTaskManager {
 
 	/*=============== Thread management methods ===============*/
 	public void start() {
-		message_consumer=new Consumer(endpoint, null, workerPool);
-		Destination source=null;
+		message_consumer=new Consumer(chan, workerPool);
 		String queue_name=null;
 		String exchange_name=null;
 		String routing_key=null;
-		DeclareOk res=null;
 
 		if (serviceTaskManagerState == STATE_PAUSED) {
 			log.info("Attempt to re-start paused TaskManager is ignored. Please use resume instead");
 			return;
 		}
 
-
-		confac=endpoint.getConnectionFactory();
-		if (dest!=null)
-			source=dest;
-		else
-			source=endpoint.getSource();
 		try {
 			sharedConnection=confac.getConnection();
 			chan=sharedConnection.createChannel();
-			if (source.getType()==AMQPConstants.QUEUE) {
-				queue_name=source.getName();
-				if (! check_destination(chan, source)) {		
+			if (dest.getType()==AMQPConstants.QUEUE) {
+				queue_name=dest.getName();
+				if (! check_destination(chan, dest)) {		
 					chan.queueDeclare(queue_name, false, false, true, null);
-					log.info("Created queue "+queue_name);
+					log.debug("Created queue "+queue_name);
 				}
 			}
 			else {
-				exchange_name=source.getName();
+				exchange_name=dest.getName();
 				// DeclarePassive does not work as expected, this is a workaround
-				if (! check_destination(chan, source))
-					chan.exchangeDeclare(exchange_name, Destination.destination_type_to_param(source.getType()));
-				routing_key=source.getRoutingKey();
+				if (! check_destination(chan, dest)) {
+					chan.exchangeDeclare(exchange_name, Destination.destination_type_to_param(dest.getType()));
+					log.debug("Created exchange "+exchange_name);
+				}
+				routing_key=dest.getRoutingKey();
 				// If routing key is not present, subscribe to everything
-				if ((routing_key==null)&&(source.getType()==AMQPConstants.TOPIC_EXCHANGE)) routing_key="#";
+				if ((routing_key==null)&&(dest.getType()==AMQPConstants.TOPIC_EXCHANGE)) routing_key="#";
 				else if (routing_key==null) routing_key="";
 
 				queue_name = chan.queueDeclare().getQueue();
-				log.info("Created queue "+queue_name);
-				chan.queueBind(queue_name, source.getName(), routing_key);
+				log.debug("Created queue "+queue_name);
+				chan.queueBind(queue_name, dest.getName(), routing_key);
 			}
 
 			//FIXME what's the consumer tag?
@@ -198,15 +188,6 @@ public class ServiceTaskManager {
 	public void setWorkerPool(WorkerPool wp) {
 		workerPool=wp;
 		
-	}
-
-	public AMQPEndpoint getEndpoint() {
-		return endpoint;
-	}
-
-	public void setEndpoint(AMQPEndpoint endpoint) {
-		this.endpoint = endpoint;
-		confac=endpoint.getConnectionFactory();
 	}
 
 	public Connection getSharedConnection() {
